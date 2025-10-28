@@ -3,6 +3,11 @@ import { supabase } from "../../../../lib/db";
 
 export async function GET(req: Request) {
   try {
+    const authHeader = req.headers.get("authorization");
+const token = authHeader?.split(" ")[1];
+if (token !== process.env.CRON_SECRET) {
+  return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+}
     const auth = req.headers.get("Authorization");
     if (auth !== `Bearer ${process.env.CRON_SECRET}`) {
       return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
