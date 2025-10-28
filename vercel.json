@@ -7,10 +7,6 @@
     {
       "path": "/api/cron/weather",
       "schedule": "0 */12 * * *"
-    },
-    {
-      "path": "/api/cron/rankings",
-      "schedule": "0 13 * * 2"
     }
   ]
 }
