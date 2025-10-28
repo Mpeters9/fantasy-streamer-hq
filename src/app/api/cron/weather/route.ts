@@ -1,13 +1,35 @@
 import { NextResponse } from "next/server";
+import { supabase } from "@/lib/db";
 
-const authorize = (req: Request) => {
-  const header = req.headers.get("Authorization");
-  return header === `Bearer ${process.env.CRON_SECRET}`;
-};
+export async function GET() {
+  try {
+    const { data: teams } = await supabase.from("teams").select("abbr, lat, lon");
 
-export async function GET(req: Request) {
-  if (!authorize(req)) return new NextResponse("Unauthorized", { status: 401 });
+    if (!teams) throw new Error("No teams found");
 
-  // ✅ later you'll call Open-Meteo here and write weather data to Supabase
-  return NextResponse.json({ ok: true, updated: new Date().toISOString() });
+    for (const team of teams) {
+      // Simulate weather API call
+      const fakeWeather = {
+        temp: Math.floor(50 + Math.random() * 30), // 50–80°F
+        wind: Math.floor(Math.random() * 20),      // 0–20 mph
+        precip: Math.random() < 0.2 ? 1 : 0,       // 20% chance rain
+        condition: "Clear",
+      };
+
+      await supabase.from("weather").upsert({
+        team_abbr: team.abbr,
+        lat: team.lat,
+        lon: team.lon,
+        temp: fakeWeather.temp,
+        wind: fakeWeather.wind,
+        precip: fakeWeather.precip,
+        condition: fakeWeather.condition,
+        last_updated: new Date().toISOString(),
+      });
+    }
+
+    return NextResponse.json({ ok: true, updated: new Date().toISOString() });
+  } catch (err: any) {
+    return NextResponse.json({ ok: false, error: err.message });
+  }
 }
