@@ -1,120 +1,110 @@
 "use client";
 
-import useSWR from "swr";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { createClient } from "@supabase/supabase-js";
 
-// --- Data Fetcher ---
-const fetcher = (url: string) => fetch(url).then((r) => r.json());
+// --- Connect to Supabase (read-only client)
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
 
-// --- Main Page Component ---
-export default function StreamersPage() {
-  const { data, error, isLoading } = useSWR("/api/streamers", fetcher);
-  const [search, setSearch] = useState("");
-  const [posFilter, setPosFilter] = useState("ALL");
-  const [availableOnly, setAvailableOnly] = useState(false);
+type Streamer = {
+  id: string;
+  name: string;
+  pos: string;
+  team: string;
+  opponent: string;
+  week: number;
+  spread: number;
+  weather: string;
+  implied_points: number;
+  usage: number;
+  score: number;
+  tier: string;
+};
 
-  if (error) return <div className="p-6 text-red-400">❌ {error.message}</div>;
-  if (isLoading || !data) return <div className="p-6">Loading streamers…</div>;
+export default function StreamerDashboard() {
+  const [streamers, setStreamers] = useState<Streamer[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  // --- Source of truth ---
-  let players = data.players ?? [];
+  useEffect(() => {
+    const fetchStreamers = async () => {
+      const { data, error } = await supabase
+        .from("streamer_scores")
+        .select("*")
+        .order("score", { ascending: false });
 
-  // --- Filters ---
-  players = players.filter((p: any) => {
-    const matchesSearch = p.name?.toLowerCase().includes(search.toLowerCase());
-    const matchesPos = posFilter === "ALL" || p.pos === posFilter;
-    const matchesAvail = !availableOnly || p.available === true;
-    return matchesSearch && matchesPos && matchesAvail;
-  });
+      if (error) {
+        console.error("Error fetching streamers:", error.message);
+      } else {
+        setStreamers(data || []);
+      }
+      setLoading(false);
+    };
 
-  return (
-    <main className="p-6 space-y-6">
-      <h1 className="text-3xl font-bold mb-4">Waiver Wire Streamers</h1>
+    fetchStreamers();
+  }, []);
 
-      {/* ---- Filter Controls ---- */}
-      <div className="flex flex-wrap gap-3 mb-6">
-        <input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search player..."
-          className="px-3 py-2 rounded bg-gray-800 text-white border border-gray-600"
-        />
+  if (loading) return <p className="p-6">Loading streamers...</p>;
 
-        <select
-          value={posFilter}
-          onChange={(e) => setPosFilter(e.target.value)}
-          className="px-3 py-2 rounded bg-gray-800 text-white border border-gray-600"
-        >
-          <option value="ALL">All Positions</option>
-          <option value="QB">QB</option>
-          <option value="RB">RB</option>
-          <option value="WR">WR</option>
-          <option value="TE">TE</option>
-        </select>
+  const tiers = ["S", "A", "B", "C", "D"];
 
-        <label className="flex items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            checked={availableOnly}
-            onChange={(e) => setAvailableOnly(e.target.checked)}
-          />
-          Available Only
-        </label>
-      </div>
-
-      <TieredTable players={players} />
-    </main>
-  );
-}
-
-// --- Tiered Table Component ---
-function TieredTable({ players }: { players: any[] }) {
-  const grouped = players.reduce(
-    (acc: Record<string, Record<string, any[]>>, p) => {
-      const posKey = p.pos ?? "UNKNOWN";
-      const tierKey = p.tier ?? "Tier 4";
-      if (!acc[posKey]) acc[posKey] = {};
-      if (!acc[posKey][tierKey]) acc[posKey][tierKey] = [];
-      acc[posKey][tierKey].push(p);
-      return acc;
-    },
-    {}
-  );
+  const tierColors: Record<string, string> = {
+    S: "from-yellow-400 to-orange-500",
+    A: "from-green-400 to-emerald-500",
+    B: "from-blue-400 to-indigo-500",
+    C: "from-purple-400 to-fuchsia-500",
+    D: "from-gray-400 to-gray-600",
+  };
 
   return (
-    <div className="space-y-8">
-      {Object.entries(grouped).map(([pos, tiers]) => (
-        <div key={pos}>
-          <h2 className="text-2xl font-bold mb-3">{pos}</h2>
-          {Object.entries(tiers).map(([tier, list]) => (
-            <div key={tier} className="mb-6">
-              <h3 className="text-lg font-semibold mb-2">{tier}</h3>
-              <table className="min-w-full border border-gray-700 rounded-lg">
-                <thead>
-                  <tr className="bg-gray-800 text-gray-200">
-                    <th className="px-3 py-2 text-left">Player</th>
-                    <th className="px-3 py-2 text-left">Team</th>
-                    <th className="px-3 py-2 text-left">Pos</th>
-                    <th className="px-3 py-2 text-right">Score</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {list.map((p) => (
-                    <tr key={p.id} className="border-t border-gray-700">
-                      <td className="px-3 py-2">{p.name}</td>
-                      <td className="px-3 py-2">{p.team}</td>
-                      <td className="px-3 py-2">{p.pos}</td>
-                      <td className="px-3 py-2 text-right">
-                        {p.score?.toFixed(1) ?? "—"}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+    <div className="p-8 space-y-10">
+      <h1 className="text-3xl font-bold">🏈 Streamer HQ Dashboard</h1>
+      <p className="text-gray-400">Automatically ranked and tiered streamers based on your weighted model.</p>
+
+      {tiers.map((tier) => {
+        const players = streamers.filter((p) => p.tier === tier);
+        if (!players.length) return null;
+
+        return (
+          <div key={tier}>
+            <h2
+              className={`text-2xl font-bold mb-3 bg-gradient-to-r ${tierColors[tier]} text-transparent bg-clip-text`}
+            >
+              Tier {tier}
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {players.map((p) => (
+                <div
+                  key={p.id}
+                  className="border border-gray-700 rounded-xl p-4 bg-white/5 hover:bg-white/10 transition"
+                >
+                  <div className="flex justify-between items-center mb-1">
+                    <h3 className="font-semibold text-lg">{p.name}</h3>
+                    <span className="text-sm text-gray-400">{p.pos}</span>
+                  </div>
+                  <p className="text-sm text-gray-300 mb-1">
+                    {p.team} vs {p.opponent}
+                  </p>
+                  <p className="text-xs text-gray-500 mb-2">
+                    Week {p.week} | Spread: {p.spread ?? "N/A"} | Weather: {p.weather ?? "N/A"}
+                  </p>
+                  <p className="text-sm">
+                    Usage: <span className="font-semibold">{p.usage?.toFixed(1) ?? 0}%</span>
+                  </p>
+                  <p className="text-sm">
+                    Implied Points: <span className="font-semibold">{p.implied_points ?? "—"}</span>
+                  </p>
+                  <p className="text-lg font-bold mt-2 text-emerald-400">
+                    🧮 Score: {p.score?.toFixed(1)}
+                  </p>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
-      ))}
+          </div>
+        );
+      })}
     </div>
   );
 }
