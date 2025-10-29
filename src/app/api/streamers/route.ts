@@ -57,3 +57,15 @@ export async function GET(req: Request) {
     console.error("❌ Streamer cron failed:", err.message);
     return NextResponse.json({ ok: false, error: err.message }, { status:}
     }
+// src/app/api/cron/streamers/route.ts
+import { NextResponse } from "next/server";
+
+export async function GET(req: Request) {
+  const auth = req.headers.get("Authorization");
+  if (auth !== "Bearer my_local_secret") {
+    return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+  }
+
+  // Temporary response until we connect scoring logic
+  return NextResponse.json({ ok: true, message: "Streamer cron executed successfully!" });
+}
