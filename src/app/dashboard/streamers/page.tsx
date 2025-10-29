@@ -3,108 +3,160 @@
 import { useEffect, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
 
-// --- Connect to Supabase (read-only client)
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
-type Streamer = {
-  id: string;
-  name: string;
-  pos: string;
-  team: string;
-  opponent: string;
-  week: number;
-  spread: number;
-  weather: string;
-  implied_points: number;
-  usage: number;
-  score: number;
-  tier: string;
-};
-
-export default function StreamerDashboard() {
-  const [streamers, setStreamers] = useState<Streamer[]>([]);
-  const [loading, setLoading] = useState(true);
+export default function StreamersPage() {
+  const [data, setData] = useState<any[]>([]);
+  const [search, setSearch] = useState("");
 
   useEffect(() => {
-    const fetchStreamers = async () => {
+    async function load() {
       const { data, error } = await supabase
         .from("streamer_scores")
-        .select("*")
-        .order("score", { ascending: false });
+        .select(`
+          player_id,
+          week,
+          score,
+          rank,
+          tier,
+          reason,
+          players ( name, team, pos )
+        `)
+        .order("rank", { ascending: true });
 
       if (error) {
-        console.error("Error fetching streamers:", error.message);
-      } else {
-        setStreamers(data || []);
+        console.error("Error loading streamers:", error);
+        return;
       }
-      setLoading(false);
-    };
 
-    fetchStreamers();
+      setData(data || []);
+    }
+
+    load();
   }, []);
 
-  if (loading) return <p className="p-6">Loading streamers...</p>;
-
-  const tiers = ["S", "A", "B", "C", "D"];
+  const filtered = data.filter((s) =>
+    s.players?.name?.toLowerCase().includes(search.toLowerCase())
+  );
 
   const tierColors: Record<string, string> = {
-    S: "from-yellow-400 to-orange-500",
-    A: "from-green-400 to-emerald-500",
-    B: "from-blue-400 to-indigo-500",
-    C: "from-purple-400 to-fuchsia-500",
-    D: "from-gray-400 to-gray-600",
+    A: "#22c55e", // green-500
+    B: "#3b82f6", // blue-500
+    C: "#eab308", // yellow-500
+    D: "#ef4444", // red-500
   };
 
   return (
-    <div className="p-8 space-y-10">
-      <h1 className="text-3xl font-bold">🏈 Streamer HQ Dashboard</h1>
-      <p className="text-gray-400">Automatically ranked and tiered streamers based on your weighted model.</p>
+    <div
+      style={{
+        padding: 20,
+        background: "#111827", // dark slate background
+        minHeight: "100vh",
+        color: "#f9fafb",
+      }}
+    >
+      <h1
+        style={{
+          fontSize: 28,
+          fontWeight: "bold",
+          marginBottom: 16,
+          textAlign: "center",
+          color: "#f3f4f6",
+        }}
+      >
+        Weekly Streamer Scores
+      </h1>
 
-      {tiers.map((tier) => {
-        const players = streamers.filter((p) => p.tier === tier);
-        if (!players.length) return null;
+      <input
+        placeholder="Search player..."
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        style={{
+          margin: "0 auto 20px",
+          display: "block",
+          padding: "10px",
+          width: "100%",
+          maxWidth: 400,
+          border: "1px solid #374151",
+          borderRadius: "8px",
+          background: "#1f2937",
+          color: "#f9fafb",
+        }}
+      />
 
-        return (
-          <div key={tier}>
-            <h2
-              className={`text-2xl font-bold mb-3 bg-gradient-to-r ${tierColors[tier]} text-transparent bg-clip-text`}
+      <div
+        style={{
+          display: "grid",
+          gap: "16px",
+          gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))",
+        }}
+      >
+        {filtered.map((s) => (
+          <div
+            key={`${s.player_id}-${s.week}`}
+            style={{
+              background: "#1f2937", // dark card
+              borderRadius: "12px",
+              boxShadow: "0 2px 10px rgba(0,0,0,0.4)",
+              padding: "16px",
+              color: "#f9fafb",
+              border: "1px solid #374151",
+              transition: "transform 0.2s ease, box-shadow 0.2s ease",
+            }}
+            onMouseEnter={(e) => {
+              (e.currentTarget as HTMLDivElement).style.transform = "translateY(-3px)";
+              (e.currentTarget as HTMLDivElement).style.boxShadow =
+                "0 4px 14px rgba(0,0,0,0.6)";
+            }}
+            onMouseLeave={(e) => {
+              (e.currentTarget as HTMLDivElement).style.transform = "";
+              (e.currentTarget as HTMLDivElement).style.boxShadow =
+                "0 2px 10px rgba(0,0,0,0.4)";
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: 8,
+              }}
             >
-              Tier {tier}
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {players.map((p) => (
-                <div
-                  key={p.id}
-                  className="border border-gray-700 rounded-xl p-4 bg-white/5 hover:bg-white/10 transition"
-                >
-                  <div className="flex justify-between items-center mb-1">
-                    <h3 className="font-semibold text-lg">{p.name}</h3>
-                    <span className="text-sm text-gray-400">{p.pos}</span>
-                  </div>
-                  <p className="text-sm text-gray-300 mb-1">
-                    {p.team} vs {p.opponent}
-                  </p>
-                  <p className="text-xs text-gray-500 mb-2">
-                    Week {p.week} | Spread: {p.spread ?? "N/A"} | Weather: {p.weather ?? "N/A"}
-                  </p>
-                  <p className="text-sm">
-                    Usage: <span className="font-semibold">{p.usage?.toFixed(1) ?? 0}%</span>
-                  </p>
-                  <p className="text-sm">
-                    Implied Points: <span className="font-semibold">{p.implied_points ?? "—"}</span>
-                  </p>
-                  <p className="text-lg font-bold mt-2 text-emerald-400">
-                    🧮 Score: {p.score?.toFixed(1)}
-                  </p>
-                </div>
-              ))}
+              <h2 style={{ fontSize: 18, fontWeight: "bold", margin: 0 }}>
+                {s.players?.name || "Unknown Player"}
+              </h2>
+              <span
+                style={{
+                  background: tierColors[s.tier] || "#6b7280",
+                  color: "#fff",
+                  padding: "4px 10px",
+                  borderRadius: "8px",
+                  fontWeight: "bold",
+                  fontSize: 12,
+                }}
+              >
+                {s.tier}
+              </span>
             </div>
+
+            <p style={{ margin: "2px 0", color: "#d1d5db" }}>
+              {s.players?.team || "??"} • {s.players?.pos || "??"}
+            </p>
+            <p style={{ margin: "2px 0", color: "#d1d5db" }}>
+              Rank: #{s.rank ?? "?"}
+            </p>
+            <p style={{ margin: "2px 0", color: "#d1d5db" }}>
+              Score: {s.score?.toFixed(2)}
+            </p>
+            <p style={{ marginTop: 8, fontSize: 12, color: "#9ca3af" }}>
+              {s.reason}
+            </p>
           </div>
-        );
-      })}
+        ))}
+      </div>
     </div>
   );
 }

@@ -7,61 +7,55 @@ const supabase = createClient(
 );
 
 export async function GET(req: Request) {
-  const auth = req.headers.get("authorization");
-  if (auth !== `Bearer ${process.env.CRON_SECRET}`) {
-    return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
-  }
-
   try {
-    // 1️⃣ Pull player data (mock or from your Supabase players table)
-    const { data: players, error: playerErr } = await supabase.from("players").select("*");
+    const auth = req.headers.get("authorization");
+    if (auth !== `Bearer ${process.env.CRON_SECRET}`) {
+      return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+    }
+
+    console.log("🎯 Running streamer scoring cron (pure JS mode)");
+
+    // Step 1: Fetch all players
+    const { data: players, error: playerErr } = await supabase
+      .from("players")
+      .select("id, name, pos, team, score");
+
     if (playerErr) throw playerErr;
-    if (!players?.length) throw new Error("No players found");
+    if (!players?.length) throw new Error("No players found.");
 
-    // 2️⃣ Pull odds & weather
-    const { data: games } = await supabase.from("games").select("*");
-    const { data: weather } = await supabase.from("weather").select("*");
+    // Step 2: Sort players by score manually (no rank())
+    const sorted = players
+      .filter((p) => typeof p.score === "number" && !isNaN(p.score))
+      .sort((a, b) => Number(b.score) - Number(a.score));
 
-    // 3️⃣ Generate Streamer Scores
-    const results = players.map((p) => {
-      const game = games?.find((g) => g.home_team === p.team || g.away_team === p.team);
-      const wx = weather?.find((w) => w.team_abbr === p.team);
+    // Step 3: Generate ranks & tiers in JavaScript
+    const results = sorted.map((p, index) => ({
+      player_id: p.id,
+      week: 9,
+      score: Number(p.score),
+      rank: index + 1,
+      tier:
+        index < 10
+          ? "A"
+          : index < 25
+          ? "B"
+          : index < 50
+          ? "C"
+          : index < 75
+          ? "D"
+          : "E",
+      reason: `Ranked ${index + 1} by score`,
+    }));
 
-      const spread = game?.spread_home || 0;
-      const implied_points = game?.implied_home || 0;
-      const usage = Math.random() * 100; // placeholder until we connect fantasy stats
-      const weather_score = wx ? (wx.temp >= 40 ? 90 : 70) : 80;
+    // Step 4: Push data to Supabase table
+    const { error: upsertErr } = await supabase
+      .from("streamer_scores")
+      .upsert(results, { onConflict: "player_id, week" });
 
-      // Weighted score
-      const score = implied_points * 0.3 + usage * 0.4 + weather_score * 0.2 + (100 - Math.abs(spread)) * 0.1;
+    if (upsertErr) throw upsertErr;
 
-      const tier =
-        score > 90 ? "S" :
-        score > 80 ? "A" :
-        score > 70 ? "B" :
-        score > 60 ? "C" : "D";
-
-      return {
-        player_id: p.id,
-        name: p.name,
-        pos: p.pos,
-        team: p.team,
-        opponent: game?.home_team === p.team ? game.away_team : game?.home_team,
-        week: game?.week || 8,
-        spread,
-        weather: wx?.description || "N/A",
-        implied_points,
-        usage,
-        score,
-        tier,
-      };
-    });
-
-    // 4️⃣ Upsert into Supabase
-    const { error: insertErr } = await supabase.from("streamer_scores").upsert(results, { onConflict: "player_id" });
-    if (insertErr) throw insertErr;
-
-    return NextResponse.json({ ok: true, inserted: results.length });
+    console.log(`✅ Upserted ${results.length} streamer scores`);
+    return NextResponse.json({ ok: true, updated: results.length });
   } catch (err: any) {
     console.error("❌ Streamer cron failed:", err.message);
     return NextResponse.json({ ok: false, error: err.message }, { status: 500 });
