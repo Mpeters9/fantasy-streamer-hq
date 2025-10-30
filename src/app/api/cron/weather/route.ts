@@ -1,35 +1,28 @@
-import { NextResponse } from "next/server";
-import { supabase } from "@/lib/db";
+import { NextResponse } from 'next/server';
 
 export async function GET() {
-  try {
-    const { data: teams } = await supabase.from("teams").select("abbr, lat, lon");
+  const weatherKey = process.env.WEATHER_API_KEY;
+  const locations = ['Philadelphia', 'Baltimore', 'Kansas City', 'Dallas', 'Green Bay'];
 
-    if (!teams) throw new Error("No teams found");
-
-    for (const team of teams) {
-      // Simulate weather API call
-      const fakeWeather = {
-        temp: Math.floor(50 + Math.random() * 30), // 50–80°F
-        wind: Math.floor(Math.random() * 20),      // 0–20 mph
-        precip: Math.random() < 0.2 ? 1 : 0,       // 20% chance rain
-        condition: "Clear",
-      };
-
-      await supabase.from("weather").upsert({
-        team_abbr: team.abbr,
-        lat: team.lat,
-        lon: team.lon,
-        temp: fakeWeather.temp,
-        wind: fakeWeather.wind,
-        precip: fakeWeather.precip,
-        condition: fakeWeather.condition,
-        last_updated: new Date().toISOString(),
+  const results: any[] = [];
+  for (const city of locations) {
+    try {
+      const res = await fetch(`https://api.weatherapi.com/v1/current.json?key=${weatherKey}&q=${city}`);
+      const json = await res.json();
+      results.push({
+        city,
+        temp_f: json.current?.temp_f,
+        condition: json.current?.condition?.text,
+        wind_mph: json.current?.wind_mph
       });
+    } catch (err) {
+      console.error(`❌ [weather] Failed for ${city}:`, err);
     }
-
-    return NextResponse.json({ ok: true, updated: new Date().toISOString() });
-  } catch (err: any) {
-    return NextResponse.json({ ok: false, error: err.message });
   }
+
+  console.log(`✅ [weather] Retrieved ${results.length} weather reports`);
+  return NextResponse.json({
+    message: 'Live weather data fetched successfully.',
+    data: results
+  });
 }

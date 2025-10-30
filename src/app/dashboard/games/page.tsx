@@ -1,60 +1,33 @@
-"use client";
-import useSWR from "swr";
-// temporary fallback — pure HTML layout
-const Card = ({ children }: any) => <div className="border rounded-lg p-4 bg-white/5">{children}</div>;
-const CardContent = ({ children }: any) => <div>{children}</div>;
-const Table = ({ children }: any) => <table className="w-full border-collapse">{children}</table>;
-const TableHeader = ({ children }: any) => <thead className="bg-gray-800 text-white">{children}</thead>;
-const TableHead = ({ children }: any) => <th className="p-2 border">{children}</th>;
-const TableBody = ({ children }: any) => <tbody>{children}</tbody>;
-const TableRow = ({ children }: any) => <tr className="border">{children}</tr>;
-const TableCell = ({ children }: any) => <td className="p-2 border text-center">{children}</td>;
+'use client';
+export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
+export const revalidate = 0; // ✅ Use number instead of false for extra safety
 
+import useSWR from 'swr';
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
-export default function GamesDashboard() {
-  const { data, error, isLoading } = useSWR("/api/games", fetcher, { refreshInterval: 60000 });
+export default function GamesPage() {
+  const { data, error, isLoading } = useSWR('/api/games', fetcher);
 
-  if (isLoading) return <p className="p-4 text-sm">Loading games...</p>;
-  if (error || !data?.ok) return <p className="p-4 text-red-500">Error: {data?.error || "Failed to load"}</p>;
-
-  const games = data.games || [];
+  if (isLoading) return <p className="p-8">Loading...</p>;
+  if (error) return <p className="p-8 text-red-400">Error loading games.</p>;
 
   return (
-    <div className="p-6 space-y-4">
-      <h1 className="text-2xl font-bold">Games Dashboard</h1>
-      <Card>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Kickoff</TableHead>
-                <TableHead>Home</TableHead>
-                <TableHead>Away</TableHead>
-                <TableHead>Spread</TableHead>
-                <TableHead>Total</TableHead>
-                <TableHead>Temp</TableHead>
-                <TableHead>Wind</TableHead>
-                <TableHead>Precip</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {games.map((g: any) => (
-                <TableRow key={g.id}>
-                  <TableCell>{new Date(g.kickoff).toLocaleString()}</TableCell>
-                  <TableCell>{g.home_abbr}</TableCell>
-                  <TableCell>{g.away_abbr}</TableCell>
-                  <TableCell>{g.spread ?? "-"}</TableCell>
-                  <TableCell>{g.total ?? "-"}</TableCell>
-                  <TableCell>{g.weather?.temp ?? "-"}</TableCell>
-                  <TableCell>{g.weather?.wind ?? "-"}</TableCell>
-                  <TableCell>{g.weather?.precipitation ?? "-"}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
-    </div>
+    <main className="p-8">
+      <h1 className="text-2xl font-bold mb-4">Games</h1>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {data?.games?.map((g: any) => (
+          <div
+            key={g.id}
+            className="border border-gray-700 rounded-lg p-4 bg-white/5"
+          >
+            <p className="font-semibold">
+              {g.home_team} vs {g.away_team}
+            </p>
+            <p className="text-gray-400">{g.date}</p>
+          </div>
+        ))}
+      </div>
+    </main>
   );
 }

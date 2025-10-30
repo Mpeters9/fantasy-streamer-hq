@@ -1,7 +1,10 @@
-"use client";
+'use client';
+export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
+export const revalidate = 0; // ✅ Use number instead of false for extra safety
 
-import { useEffect, useState } from "react";
-import { createClient } from "@supabase/supabase-js";
+import { useEffect, useState } from 'react';
+import { createClient } from '@supabase/supabase-js';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -9,154 +12,34 @@ const supabase = createClient(
 );
 
 export default function StreamersPage() {
-  const [data, setData] = useState<any[]>([]);
-  const [search, setSearch] = useState("");
+  const [streamers, setStreamers] = useState<any[]>([]);
 
   useEffect(() => {
-    async function load() {
-      const { data, error } = await supabase
-        .from("streamer_scores")
-        .select(`
-          player_id,
-          week,
-          score,
-          rank,
-          tier,
-          reason,
-          players ( name, team, pos )
-        `)
-        .order("rank", { ascending: true });
-
-      if (error) {
-        console.error("Error loading streamers:", error);
-        return;
-      }
-
-      setData(data || []);
-    }
-
+    const load = async () => {
+      const { data } = await supabase.from('streamers').select('*');
+      setStreamers(data || []);
+    };
     load();
   }, []);
 
-  const filtered = data.filter((s) =>
-    s.players?.name?.toLowerCase().includes(search.toLowerCase())
-  );
-
-  const tierColors: Record<string, string> = {
-    A: "#22c55e", // green-500
-    B: "#3b82f6", // blue-500
-    C: "#eab308", // yellow-500
-    D: "#ef4444", // red-500
-  };
-
   return (
-    <div
-      style={{
-        padding: 20,
-        background: "#111827", // dark slate background
-        minHeight: "100vh",
-        color: "#f9fafb",
-      }}
-    >
-      <h1
-        style={{
-          fontSize: 28,
-          fontWeight: "bold",
-          marginBottom: 16,
-          textAlign: "center",
-          color: "#f3f4f6",
-        }}
-      >
-        Weekly Streamer Scores
-      </h1>
-
-      <input
-        placeholder="Search player..."
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        style={{
-          margin: "0 auto 20px",
-          display: "block",
-          padding: "10px",
-          width: "100%",
-          maxWidth: 400,
-          border: "1px solid #374151",
-          borderRadius: "8px",
-          background: "#1f2937",
-          color: "#f9fafb",
-        }}
-      />
-
-      <div
-        style={{
-          display: "grid",
-          gap: "16px",
-          gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))",
-        }}
-      >
-        {filtered.map((s) => (
-          <div
-            key={`${s.player_id}-${s.week}`}
-            style={{
-              background: "#1f2937", // dark card
-              borderRadius: "12px",
-              boxShadow: "0 2px 10px rgba(0,0,0,0.4)",
-              padding: "16px",
-              color: "#f9fafb",
-              border: "1px solid #374151",
-              transition: "transform 0.2s ease, box-shadow 0.2s ease",
-            }}
-            onMouseEnter={(e) => {
-              (e.currentTarget as HTMLDivElement).style.transform = "translateY(-3px)";
-              (e.currentTarget as HTMLDivElement).style.boxShadow =
-                "0 4px 14px rgba(0,0,0,0.6)";
-            }}
-            onMouseLeave={(e) => {
-              (e.currentTarget as HTMLDivElement).style.transform = "";
-              (e.currentTarget as HTMLDivElement).style.boxShadow =
-                "0 2px 10px rgba(0,0,0,0.4)";
-            }}
-          >
+    <main className="p-8">
+      <h1 className="text-2xl font-bold mb-4">Streamers</h1>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {streamers.length ? (
+          streamers.map((s) => (
             <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                marginBottom: 8,
-              }}
+              key={s.id}
+              className="border border-gray-700 rounded-lg p-4 bg-white/5"
             >
-              <h2 style={{ fontSize: 18, fontWeight: "bold", margin: 0 }}>
-                {s.players?.name || "Unknown Player"}
-              </h2>
-              <span
-                style={{
-                  background: tierColors[s.tier] || "#6b7280",
-                  color: "#fff",
-                  padding: "4px 10px",
-                  borderRadius: "8px",
-                  fontWeight: "bold",
-                  fontSize: 12,
-                }}
-              >
-                {s.tier}
-              </span>
+              <p className="font-semibold">{s.name}</p>
+              <p className="text-gray-400">{s.team}</p>
             </div>
-
-            <p style={{ margin: "2px 0", color: "#d1d5db" }}>
-              {s.players?.team || "??"} • {s.players?.pos || "??"}
-            </p>
-            <p style={{ margin: "2px 0", color: "#d1d5db" }}>
-              Rank: #{s.rank ?? "?"}
-            </p>
-            <p style={{ margin: "2px 0", color: "#d1d5db" }}>
-              Score: {s.score?.toFixed(2)}
-            </p>
-            <p style={{ marginTop: 8, fontSize: 12, color: "#9ca3af" }}>
-              {s.reason}
-            </p>
-          </div>
-        ))}
+          ))
+        ) : (
+          <p className="text-gray-400">No streamers found.</p>
+        )}
       </div>
-    </div>
+    </main>
   );
 }

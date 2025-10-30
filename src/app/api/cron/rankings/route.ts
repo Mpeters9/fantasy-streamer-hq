@@ -1,13 +1,14 @@
-import { NextResponse } from "next/server";
+import { NextResponse } from 'next/server';
 
-const authorize = (req: Request) => {
-  const header = req.headers.get("Authorization");
-  return header === `Bearer ${process.env.CRON_SECRET}`;
-};
+export async function GET() {
+  // Simple static team ranks (replace later with ESPN API or PFF)
+  const rankings = [
+    { team: 'BAL', rank: 1, offense: 89, defense: 91 },
+    { team: 'KC', rank: 2, offense: 92, defense: 85 },
+    { team: 'PHI', rank: 3, offense: 90, defense: 83 }
+  ];
 
-export async function GET(req: Request) {
-  if (!authorize(req)) return new NextResponse("Unauthorized", { status: 401 });
-
-  // ✅ later you'll compute QB/RB/WR scores and write them to Supabase.rankings
-  return NextResponse.json({ ok: true, recalculated: new Date().toISOString() });
+  console.log('✅ [rankings] Static team ranks used for now');
+  return NextResponse.json({ message: 'Rankings loaded', data: rankings });
 }
+  

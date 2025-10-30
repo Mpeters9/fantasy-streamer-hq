@@ -1,33 +1,13 @@
-// src/app/api/cron/players/route.ts
-import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-import { fetchSleeperPlayers } from "@/lib/sleeper-api";
+import { NextResponse } from 'next/server';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+export async function GET() {
+  // (You can later hook this to SportsData.io or Sleeper API)
+  const mock = [
+    { name: 'CJ Stroud', team: 'HOU', position: 'QB', projection: 19.5 },
+    { name: 'Sam LaPorta', team: 'DET', position: 'TE', projection: 14.2 },
+    { name: 'James Cook', team: 'BUF', position: 'RB', projection: 13.1 }
+  ];
 
-export async function GET(req: Request) {
-  const auth = req.headers.get("authorization");
-  if (auth !== `Bearer ${process.env.CRON_SECRET}`) {
-    return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
-  }
-
-  try {
-    console.log("🧩 Fetching live Sleeper players...");
-    const players = await fetchSleeperPlayers();
-
-    // Upsert by Sleeper ID (prevents duplicates)
-    const { error: insertErr } = await supabase
-      .from("players")
-      .upsert(players, { onConflict: "sleeper_id" });
-
-    if (insertErr) throw insertErr;
-    console.log(`✅ Inserted/updated ${players.length} players`);
-    return NextResponse.json({ ok: true, count: players.length });
-  } catch (err: any) {
-    console.error("❌ Player cron failed:", err.message);
-    return NextResponse.json({ ok: false, error: err.message }, { status: 500 });
-  }
+  console.log('✅ [players] Mock player projections returned (real API TBD)');
+  return NextResponse.json({ message: 'Player data ready.', data: mock });
 }
