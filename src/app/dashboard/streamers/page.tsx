@@ -1,45 +1,79 @@
-'use client';
-export const dynamic = 'force-dynamic';
-export const fetchCache = 'force-no-store';
-export const revalidate = 0; // ✅ Use number instead of false for extra safety
+import { NextResponse } from "next/server";
 
-import { useEffect, useState } from 'react';
-import { createClient } from '@supabase/supabase-js';
+export async function GET() {
+  try {
+    console.log("🎯 [streamers] Fetching updated waiver streamers...");
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+    // 1️⃣ Fetch Sleeper player data (free API)
+    const sleeperRes = await fetch("https://api.sleeper.app/v1/players/nfl", {
+      cache: "no-store",
+    });
+    const sleeperData = await sleeperRes.json();
 
-export default function StreamersPage() {
-  const [streamers, setStreamers] = useState<any[]>([]);
+    // 2️⃣ Convert Sleeper data into a quick lookup table
+    const players = Object.values(sleeperData) as any[];
 
-  useEffect(() => {
-    const load = async () => {
-      const { data } = await supabase.from('streamers').select('*');
-      setStreamers(data || []);
+    // Helper: find player by name and get percent rostered (fallback 0)
+    const getRosterPercent = (name: string) => {
+      const match = players.find(
+        (p) =>
+          p.full_name?.toLowerCase() === name.toLowerCase() ||
+          `${p.first_name} ${p.last_name}`.toLowerCase() === name.toLowerCase()
+      );
+      return match?.percent_rostered ?? 0;
     };
-    load();
-  }, []);
 
-  return (
-    <main className="p-8">
-      <h1 className="text-2xl font-bold mb-4">Streamers</h1>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {streamers.length ? (
-          streamers.map((s) => (
-            <div
-              key={s.id}
-              className="border border-gray-700 rounded-lg p-4 bg-white/5"
-            >
-              <p className="font-semibold">{s.name}</p>
-              <p className="text-gray-400">{s.team}</p>
-            </div>
-          ))
-        ) : (
-          <p className="text-gray-400">No streamers found.</p>
-        )}
-      </div>
-    </main>
-  );
+    // 3️⃣ Mock some “base performance” data (since we don’t have live stats yet)
+    //    This should eventually pull from your real player API.
+    const mockPlayers = [
+      { name: "Tyrone Tracy", team: "NYG", position: "RB", overall: 18.6 },
+      { name: "Jerome Ford", team: "CLE", position: "RB", overall: 17.9 },
+      { name: "Tank Bigsby", team: "PHI", position: "RB", overall: 16.4 },
+      { name: "Jayden Higgins", team: "HOU", position: "WR", overall: 16.9 },
+      { name: "Tre Tucker", team: "LV", position: "WR", overall: 15.8 },
+      { name: "Colston Loveland", team: "CHI", position: "TE", overall: 14.2 },
+      { name: "Hunter Henry", team: "NE", position: "TE", overall: 13.9 },
+      { name: "Rams DST", team: "LAR", position: "DST", overall: 13.5 },
+      { name: "Ravens DST", team: "BAL", position: "DST", overall: 13.3 },
+      { name: "Jaguars DST", team: "JAX", position: "DST", overall: 13.1 },
+    ];
+
+    // 4️⃣ Attach roster % and filter waiver-eligible (<50% rostered)
+    const WAIVER_THRESHOLD = 0.5;
+    const enriched = mockPlayers.map((p) => ({
+      ...p,
+      percentRostered: getRosterPercent(p.name),
+    }));
+
+    const waiverOnly = enriched.filter(
+      (p) => p.percentRostered === 0 || p.percentRostered <= WAIVER_THRESHOLD
+    );
+
+    // 5️⃣ Group by position
+    const grouped: Record<string, any[]> = {};
+    for (const pl of waiverOnly) {
+      if (!grouped[pl.position]) grouped[pl.position] = [];
+      grouped[pl.position].push(pl);
+    }
+
+    // 6️⃣ Limit top 5 per position
+    for (const key of Object.keys(grouped)) {
+      grouped[key] = grouped[key]
+        .sort((a, b) => b.overall - a.overall)
+        .slice(0, 5);
+    }
+
+    // ✅ Final return
+    return NextResponse.json({
+      status: "success",
+      updated: new Date().toISOString(),
+      data: grouped,
+    });
+  } catch (err) {
+    console.error("❌ [streamers] Error:", err);
+    return NextResponse.json(
+      { status: "error", message: "Failed to build streamer list" },
+      { status: 500 }
+    );
+  }
 }

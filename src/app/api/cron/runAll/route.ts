@@ -1,27 +1,40 @@
-import { NextResponse } from 'next/server';
-import fetch from 'node-fetch';
+import { NextResponse } from "next/server";
 
-export async function POST(req: Request) {
-  const auth = req.headers.get('authorization');
-  if (auth !== 'Bearer my_local_secret') {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+export async function GET() {
+  try {
+    console.log("🚀 [runAll] Running all cron tasks...");
+
+    // Local API routes to run in parallel
+    const endpoints = [
+      "/api/cron/odds",
+      "/api/cron/weather",
+      "/api/cron/rankings",
+      "/api/cron/players",
+      "/api/cron/streamers",
+    ];
+
+    // Fetch all local data concurrently
+    const results = await Promise.all(
+      endpoints.map(async (path) => {
+        try {
+          const res = await fetch(`http://localhost:3000${path}`, { cache: "no-store" });
+          const json = await res.json();
+          return { path, ...json };
+        } catch (err: any) {
+          console.error(`❌ [runAll] Error on ${path}:`, err.message);
+          return { path, status: "error", message: err.message, data: [] };
+        }
+      })
+    );
+
+    const merged = Object.fromEntries(
+      results.map((r) => [r.path.split("/").pop(), r])
+    );
+
+    console.log("✅ [runAll] Completed all API merges.");
+    return NextResponse.json({ status: "success", merged });
+  } catch (err: any) {
+    console.error("❌ [runAll] Critical failure:", err.message);
+    return NextResponse.json({ status: "error", message: err.message });
   }
-
-  const baseUrl = process.env.CRON_BASE_URL || 'http://localhost:3000';
-  const endpoints = ['odds', 'weather', 'rankings', 'players', 'streamers'];
-  const results: Record<string, string> = {};
-
-  for (const ep of endpoints) {
-    try {
-      const res = await fetch(`${baseUrl}/api/cron/${ep}`, {
-        headers: { Authorization: 'Bearer my_local_secret' }
-      });
-      const text: string = await res.text();
-      results[ep] = text;
-    } catch (err: any) {
-      results[ep] = `Failed: ${err.message}`;
-    }
-  }
-
-  return NextResponse.json({ results });
 }
