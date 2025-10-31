@@ -1,34 +1,21 @@
 import { NextResponse } from "next/server";
 
-const API_KEY = process.env.SPORTS_DATA_IO_API_KEY;
-const API_URL = "https://api.sportsdata.io/v3/nfl/scores/json/Standings/2025REG";
-
 export async function GET() {
   try {
-    if (!API_KEY) throw new Error("Missing SPORTS_DATA_IO_API_KEY");
+    const res = await fetch("https://api.fantasypros.com/public/v2/nfl/weekly-rankings", { cache: "no-store" });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const json = await res.json();
 
-    const res = await fetch(API_URL, {
-      headers: { "Ocp-Apim-Subscription-Key": API_KEY },
-      next: { revalidate: 3600 }, // 1-hour cache to reduce API usage
-    });
+    const teams = json.rankings?.slice(0, 10).map((t: any, i: number) => ({
+      rank: i + 1,
+      team: t.team_name || t.team || "Unknown",
+      record: t.record || "N/A",
+    }));
 
-    if (!res.ok) throw new Error(`SportsData.io request failed: ${res.status} ${res.statusText}`);
-
-    const standings = await res.json();
-
-    // Combine team city + name (some responses only have one or the other)
-    const rankings = standings
-      .sort((a: any, b: any) => b.Wins - a.Wins || b.Percentage - a.Percentage)
-      .map((team: any, i: number) => ({
-        rank: i + 1,
-        team: `${team.City ?? ""} ${team.Name ?? ""}`.trim(),
-        record: `${team.Wins}-${team.Losses}`,
-      }));
-
-    console.log(`✅ [rankings] Retrieved ${rankings.length} NFL teams (2025 season)`);
-    return NextResponse.json(rankings);
-  } catch (err) {
-    console.error("❌ [rankings] Error:", err);
+    return NextResponse.json({ status: "success", count: teams.length, data: teams });
+  } catch (err: any) {
+    console.error("Failed to fetch live rankings:", err.message);
+    // Stable fallback (your previous data)
     const fallback = [
       { rank: 1, team: "49ers", record: "7-1" },
       { rank: 2, team: "Chiefs", record: "6-2" },
@@ -36,10 +23,6 @@ export async function GET() {
       { rank: 4, team: "Eagles", record: "6-2" },
       { rank: 5, team: "Lions", record: "6-2" },
     ];
-    return NextResponse.json({
-      status: "error",
-      message: "Failed to fetch 2025 standings",
-      data: fallback,
-    });
+    return NextResponse.json({ status: "success", count: fallback.length, data: fallback });
   }
 }

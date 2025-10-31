@@ -1,13 +1,11 @@
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
-
-export default function Home() {
+export default function HomePage() {
   return (
-    <main className="flex flex-col items-center justify-center h-screen text-center">
-      <h1 className="text-4xl font-bold mb-4">Fantasy Streamer HQ</h1>
-      <p className="text-gray-400 mb-6">
-        Launch the dashboard from the sidebar or menu to get started.
+    <div className="flex flex-col items-center justify-center text-center h-full">
+      <h1 className="text-4xl font-bold mb-2">🏈 Fantasy Streamer HQ</h1>
+      <p className="text-gray-400 mb-4">
+        Launch the dashboard from the sidebar to get started.
       </p>
-    </main>
+      <p className="text-gray-500">Use the 🧠 Manual Entry tab to input players.</p>
+    </div>
   );
 }
