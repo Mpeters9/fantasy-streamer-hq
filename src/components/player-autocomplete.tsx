@@ -1,100 +1,79 @@
 "use client";
+
 import React, { useState, useEffect } from "react";
 
 interface Player {
   id: string;
   name: string;
-  team: string;
-  teamName: string;
   position: string;
-  headshot?: string;
+  team: string;
 }
 
-export default function PlayerAutocomplete({
-  onSelect,
-}: {
+interface Props {
   onSelect: (player: Player) => void;
-}) {
+}
+
+export default function PlayerAutocomplete({ onSelect }: Props) {
   const [players, setPlayers] = useState<Player[]>([]);
   const [query, setQuery] = useState("");
   const [filtered, setFiltered] = useState<Player[]>([]);
   const [loading, setLoading] = useState(false);
 
-  // ✅ Fetch live 2025 data from /api/cron/players
   useEffect(() => {
-    async function load() {
+    const loadPlayers = async () => {
       setLoading(true);
       try {
         const res = await fetch("/api/cron/players");
         const data = await res.json();
-        if (data.status === "success") {
-          setPlayers(data.data);
-        } else {
-          console.error("Failed to load player data:", data.message);
-        }
+        if (data.status === "success") setPlayers(data.data || []);
       } catch (err) {
-        console.error("Error fetching players:", err);
-      } finally {
-        setLoading(false);
+        console.error("❌ Failed to fetch players:", err);
       }
-    }
-    load();
+      setLoading(false);
+    };
+    loadPlayers();
   }, []);
 
   useEffect(() => {
-    if (query.length === 0) {
-      setFiltered([]);
-      return;
-    }
+    if (!query.trim()) return setFiltered([]);
+    const q = query.toLowerCase();
     setFiltered(
-      players.filter((p) =>
-        p.name.toLowerCase().includes(query.toLowerCase())
-      )
+      players
+        .filter((p) => p.name.toLowerCase().includes(q))
+        .slice(0, 8)
     );
   }, [query, players]);
 
+  const handleSelect = (p: Player) => {
+    setQuery(p.name);
+    setFiltered([]);
+    onSelect(p);
+  };
+
   return (
-    <div className="relative w-80">
+    <div className="relative w-full">
       <input
         type="text"
-        className="w-full rounded-md border border-gray-700 bg-gray-900 text-white px-3 py-2"
-        placeholder="Search player..."
+        className="w-full px-3 py-2 rounded bg-neutral-700 text-white placeholder:text-neutral-400"
+        placeholder={loading ? "Loading players..." : "Search player..."}
         value={query}
         onChange={(e) => setQuery(e.target.value)}
       />
-
-      {loading && (
-        <p className="absolute right-2 top-2 text-xs text-gray-500">Loading...</p>
-      )}
-
       {filtered.length > 0 && (
-        <div className="absolute z-10 mt-1 w-full bg-gray-800 rounded-lg shadow-lg max-h-72 overflow-y-auto border border-gray-700">
-          {filtered.slice(0, 15).map((p) => (
-            <div
+        <ul className="absolute z-20 bg-neutral-800 border border-neutral-700 w-full rounded mt-1 max-h-60 overflow-y-auto">
+          {filtered.map((p) => (
+            <li
               key={p.id}
-              onClick={() => {
-                onSelect(p);
-                setQuery(p.name);
-                setFiltered([]);
-              }}
-              className="px-3 py-2 hover:bg-gray-700 cursor-pointer flex items-center gap-3"
+              className="p-2 hover:bg-neutral-700 cursor-pointer flex justify-between"
+              onClick={() => handleSelect(p)}
             >
-              {p.headshot && (
-                <img
-                  src={p.headshot}
-                  alt={p.name}
-                  className="w-8 h-8 rounded-full object-cover"
-                />
-              )}
-              <div>
-                <p className="font-medium">{p.name}</p>
-                <p className="text-sm text-gray-400">
-                  {p.team} • {p.position}
-                </p>
-              </div>
-            </div>
+              <span>
+                {p.name} <span className="text-neutral-400">({p.position})</span>
+              </span>
+              <span className="text-neutral-300">{p.team}</span>
+            </li>
           ))}
-        </div>
+        </ul>
       )}
     </div>
   );
