@@ -1,216 +1,211 @@
 "use client";
+import React, { useState, useEffect } from "react";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Card, CardHeader, CardContent, CardTitle } from "@/components/ui/card";
+import PlayerAutocomplete from "@/components/player-autocomplete";
 
-import React, { useEffect, useState } from "react";
+interface PlayerRow {
+  id: string;
+  name: string;
+  team: string;
+  position: string;
+  opponent?: string;
+  spread?: number | null;
+  weather?: string;
+  impliedPts?: number | null;
+  stats?: string;
+  score?: number;
+  tier?: string;
+}
 
-export default function ManualDashboard() {
-  const [players, setPlayers] = useState<any[]>([]);
-  const [filtered, setFiltered] = useState<any[]>([]);
-  const [query, setQuery] = useState("");
-  const [selected, setSelected] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
+export default function ManualPage() {
+  const [players, setPlayers] = useState<PlayerRow[]>([]);
+  const [week, setWeek] = useState<number>(0);
+  const [stats, setStats] = useState<any[]>([]);
 
-  // ✅ Load all players (QB/RB/WR/TE)
+  // ░░ INITIAL LOAD ░░
   useEffect(() => {
-    const loadPlayers = async () => {
+    const init = async () => {
       try {
-        const res = await fetch("/api/cron/players");
-        const json = await res.json();
-        const all = Object.values(json.data || {}).flat();
-        setPlayers(all);
+        const w = await fetch("/api/cron/week", { cache: "no-store" });
+        const wd = await w.json();
+        setWeek(wd?.week || 0);
+
+        const s = localStorage.getItem("fshq_players");
+        if (s) setPlayers(JSON.parse(s));
+
+        // preload stats
+        const res = await fetch("/api/cron/stats", { cache: "no-store" });
+        const data = await res.json();
+        console.log("📊 Loaded stats:", data.count);
+        setStats(data.data || []);
       } catch (err) {
-        console.error("Failed to fetch players:", err);
+        console.error("❌ Initial load failed:", err);
       }
     };
-    loadPlayers();
+    init();
   }, []);
 
-  // ✅ Filter suggestions
+  // ░░ SAVE LOCAL ░░
   useEffect(() => {
-    if (!query) {
-      setFiltered([]);
-      return;
-    }
-    const q = query.toLowerCase();
-    const f = players.filter(
-      (p: any) =>
-        p.name.toLowerCase().includes(q) ||
-        p.team.toLowerCase().includes(q) ||
-        p.position.toLowerCase().includes(q)
+    if (players.length)
+      localStorage.setItem("fshq_players", JSON.stringify(players));
+  }, [players]);
+
+  // ░░ ADD PLAYER ░░
+  const addPlayer = (p: PlayerRow) => {
+    if (players.some((x) => x.name === p.name)) return;
+    const statLine = findStatLine(p);
+    setPlayers([
+      ...players,
+      { ...p, stats: statLine, score: 0, tier: "Unranked" },
+    ]);
+  };
+
+  // ░░ FIND PLAYER STATS ░░
+  const findStatLine = (p: PlayerRow): string => {
+    if (!stats?.length) return "N/A";
+    const match = stats.find(
+      (s) =>
+        s.name?.toLowerCase() === p.name.toLowerCase() &&
+        s.team === p.team
     );
-    setFiltered(f.slice(0, 8));
-  }, [query, players]);
+    if (!match) return "N/A";
 
-  // ✅ Fetch contextual team data for a player
-  const getTeamContext = async (team: string) => {
-    try {
-      const res = await fetch("/api/cron/autoFill");
-      const json = await res.json();
-      return (json.data || []).find(
-        (t: any) => t.team?.toLowerCase() === team.toLowerCase().trim()
-      );
-    } catch (err) {
-      console.error("Error loading context:", err);
-      return null;
-    }
+    const pos = match.position;
+    if (pos === "QB")
+      return `Pass Yds ${match.passYds ?? 0} TD ${match.passTD ?? 0} INT ${match.int ?? 0} Rush ${match.rushYds ?? 0}`;
+    if (pos === "RB")
+      return `Rush ${match.rushYds ?? 0} yds / ${match.rushAtt ?? 0} att  Rec ${match.rec ?? 0} (${match.recYds ?? 0})`;
+    if (pos === "WR" || pos === "TE")
+      return `Rec ${match.rec ?? 0} (${match.recYds ?? 0}) TD ${match.recTD ?? 0}`;
+    if (pos === "K")
+      return `FG ${match.fgMade ?? 0}-${match.fgMiss ?? 0} XP ${match.xpMade ?? 0}`;
+    if (pos === "DST")
+      return `Sacks ${match.sacks ?? 0} INT ${match.defInt ?? 0} TD ${match.defTD ?? 0}`;
+    return "N/A";
   };
 
-  // ✅ Priority Score Formula
-  const calculateScore = (p: any) => {
-    const oppRank = Number(p.OppRank_vs_Pos || 15);
-    const implied = Number(p.ImpliedPts || 20);
-    const recent = Number(p.RecentAvg || 10);
-    const spread = Number(p.Spread || 0);
-    const weatherBonus = p.Weather_OK ? 5 : 0;
+  // ░░ REMOVE ░░
+  const removePlayer = (id: string) =>
+    setPlayers(players.filter((p) => p.id !== id));
 
-    let score =
-      (30 * (32 - oppRank)) / 32 + // inverse rank
-      0.2 * implied +
-      0.25 * recent +
-      0.1 * (spread > 0 ? 2 : 1) +
-      weatherBonus;
-
-    return Math.round(score);
+  // ░░ REFRESH ░░
+  const handleRefresh = async () => {
+    console.log("🔁 Force refresh triggered…");
+    const res = await fetch("/api/cron/stats", { cache: "no-store" });
+    const data = await res.json();
+    setStats(data.data || []);
+    console.log("✅ Refreshed stats:", data.count);
+    setPlayers((prev) =>
+      prev.map((p) => ({
+        ...p,
+        stats: findStatLine(p),
+      }))
+    );
   };
 
-  // ✅ When user selects player
-  const handleSelect = async (player: any) => {
-    setQuery("");
-    setFiltered([]);
+  // ░░ VISUALS ░░
+  const posAccent = (pos: string) =>
+    ({
+      QB: "border-sky-500",
+      RB: "border-emerald-500",
+      WR: "border-violet-500",
+      TE: "border-amber-400",
+      K: "border-rose-400",
+      DST: "border-gray-500",
+    }[pos] || "border-gray-600");
 
-    if (selected.find((p) => p.player === player.name)) return;
-
-    const context = await getTeamContext(player.team);
-
-    const enriched = {
-      player: player.name,
-      team: player.team,
-      position: player.position,
-      opponent: context?.Opponent || "—",
-      spread: context?.Spread ?? "-",
-      total: context?.Total ?? "-",
-      implied: context?.ImpliedPts ?? "-",
-      oppRank: context?.[`OppRank_vs_${player.position}`] ?? 15,
-      recentAvg: player.recentAvg ?? 10,
-      weather: context?.Weather_OK ?? true,
-      score: 0,
-      rank: "-",
-    };
-
-    const score = calculateScore({
-      OppRank_vs_Pos: enriched.oppRank,
-      ImpliedPts: enriched.implied,
-      RecentAvg: enriched.recentAvg,
-      Spread: enriched.spread,
-      Weather_OK: enriched.weather,
-    });
-
-    enriched.score = score;
-
-    setSelected((prev) => {
-      const updated = [...prev, enriched];
-      // Recalculate ranks
-      const sorted = [...updated].sort((a, b) => b.score - a.score);
-      return sorted.map((p, i) => ({ ...p, rank: i + 1 }));
-    });
-  };
+  const scoreColor = (s?: number) =>
+    s == null
+      ? "text-gray-300"
+      : s >= 85
+      ? "text-red-400"
+      : s >= 70
+      ? "text-orange-300"
+      : s >= 55
+      ? "text-yellow-300"
+      : "text-gray-300";
 
   return (
-    <div className="min-h-screen bg-gray-950 text-gray-100 p-8">
-      <div className="max-w-7xl mx-auto space-y-8">
-        <header className="flex items-center justify-between border-b border-gray-700 pb-4">
-          <h1 className="text-3xl font-bold">🏈 Fantasy Streamer HQ</h1>
-          <p className="text-gray-400 text-sm">
-            Auto-calculating Streamer Priority Scores
-          </p>
-        </header>
-
-        {/* 🔍 Search */}
-        <div className="relative">
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Type player name..."
-            className="w-full px-4 py-3 rounded-lg bg-gray-900 text-gray-200 border border-gray-700 focus:ring-2 focus:ring-blue-500 outline-none"
-          />
-          {filtered.length > 0 && (
-            <ul className="absolute z-20 w-full bg-gray-900 border border-gray-700 rounded-lg mt-1 max-h-60 overflow-y-auto">
-              {filtered.map((p, i) => (
-                <li
-                  key={i}
-                  className="px-4 py-2 hover:bg-blue-600 hover:text-white cursor-pointer transition"
-                  onClick={() => handleSelect(p)}
-                >
-                  {p.name} — {p.team} ({p.position})
-                </li>
-              ))}
-            </ul>
-          )}
+    <div className="min-h-screen bg-[#0b0d12] text-gray-100 px-4 py-6">
+      <div className="max-w-5xl mx-auto space-y-6">
+        {/* header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <h1 className="text-3xl font-bold flex items-center gap-2 text-white">
+            📈 Manual Waiver Dashboard
+          </h1>
+          <div className="flex gap-2">
+            <PlayerAutocomplete onSelect={addPlayer} />
+            <Button
+              onClick={handleRefresh}
+              className="bg-sky-600 hover:bg-sky-700 text-white"
+            >
+              🔄 Force Data Refresh
+            </Button>
+          </div>
         </div>
 
-        {/* 📊 Table */}
-        <div className="overflow-x-auto rounded-lg border border-gray-800">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-900 text-gray-200">
-              <tr>
-                {[
-                  "Player",
-                  "Pos",
-                  "Team",
-                  "Opp",
-                  "Spread",
-                  "Total",
-                  "Implied",
-                  "OppRank",
-                  "RecentAvg",
-                  "Weather",
-                  "Score",
-                  "Rank",
-                ].map((col) => (
-                  <th key={col} className="px-4 py-2 text-left">
-                    {col}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {selected.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={12}
-                    className="text-center py-6 text-gray-500 italic"
+        <div className="text-gray-400 text-sm">
+          Current Week:{" "}
+          <span className="font-semibold text-sky-400">Week {week || "…"}</span>
+        </div>
+
+        {/* cards */}
+        <div className="space-y-5">
+          {players.map((p) => (
+            <Card
+              key={p.id}
+              className={`relative bg-gradient-to-br from-[#1c1f28] to-[#101218] border-l-4 ${posAccent(
+                p.position
+              )} border-gray-800 rounded-xl hover:shadow-lg hover:shadow-sky-500/10 transition-all`}
+            >
+              <CardHeader className="flex justify-between items-center border-b border-gray-800/60">
+                <CardTitle className="flex justify-between w-full text-lg font-semibold text-white">
+                  <span>
+                    {p.name}{" "}
+                    <span className="text-gray-400">
+                      ({p.team} – {p.position})
+                    </span>
+                  </span>
+                  <button
+                    onClick={() => removePlayer(p.id)}
+                    className="bg-red-600 hover:bg-red-700 text-white px-2 py-1 text-xs rounded-md"
                   >
-                    Start typing to scout players
-                  </td>
-                </tr>
-              ) : (
-                selected.map((p, i) => (
-                  <tr
-                    key={i}
-                    className="border-t border-gray-800 hover:bg-gray-900 transition"
-                  >
-                    <td className="px-4 py-2">{p.player}</td>
-                    <td className="px-4 py-2">{p.position}</td>
-                    <td className="px-4 py-2">{p.team}</td>
-                    <td className="px-4 py-2">{p.opponent}</td>
-                    <td className="px-4 py-2">{p.spread}</td>
-                    <td className="px-4 py-2">{p.total}</td>
-                    <td className="px-4 py-2">{p.implied}</td>
-                    <td className="px-4 py-2">{p.oppRank}</td>
-                    <td className="px-4 py-2">{p.recentAvg}</td>
-                    <td className="px-4 py-2">
-                      {p.weather ? "✅ OK" : "⚠️ Risky"}
-                    </td>
-                    <td className="px-4 py-2 font-bold text-blue-400">
-                      {p.score}
-                    </td>
-                    <td className="px-4 py-2 font-bold text-emerald-400">
-                      {p.rank}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                    ✕
+                  </button>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-sm pt-3">
+                <div>
+                  <span className="text-gray-400 font-medium">Opponent:</span>{" "}
+                  <span className="text-white">{p.opponent || "TBD"}</span>
+                </div>
+                <div>
+                  <span className="text-gray-400 font-medium">Spread:</span>{" "}
+                  <span className="text-white">
+                    {p.spread != null ? p.spread : "N/A"}
+                  </span>
+                </div>
+                <div className="sm:col-span-2">
+                  <span className="text-gray-400 font-medium">Last Game:</span>{" "}
+                  <span className="text-white">{p.stats || "N/A"}</span>
+                </div>
+                <div>
+                  <span className="text-gray-400 font-medium">Score:</span>{" "}
+                  <span className={`font-semibold ${scoreColor(p.score)}`}>
+                    {p.score ?? 0}
+                  </span>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+          {!players.length && (
+            <div className="text-gray-500 italic text-center py-10">
+              No players added yet — search above to start building your waiver list.
+            </div>
+          )}
         </div>
       </div>
     </div>

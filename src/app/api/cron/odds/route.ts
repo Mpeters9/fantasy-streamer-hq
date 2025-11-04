@@ -1,32 +1,74 @@
 import { NextResponse } from "next/server";
 
+/**
+ * Fetches NFL game odds for the current live ESPN week.
+ * Works automatically with ESPN's public data, no API key required.
+ */
 export async function GET() {
   try {
-    // Example live API (replace with your preferred odds API)
-    const res = await fetch("https://api.the-odds-api.com/v4/sports/americanfootball_nfl/odds/?regions=us&oddsFormat=american", {
-      headers: { "x-api-key": process.env.ODDS_API_KEY || "" },
+    // Step 1: Get the current NFL week dynamically from ESPN
+    const scoreboard = await fetch("https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard", {
+      cache: "no-store",
+    }).then((r) => r.json());
+
+    let weekNum = scoreboard?.week?.number ?? 0;
+
+    // ✅ Fix ESPN's Tuesday lag
+    const today = new Date();
+    const day = today.getUTCDay();
+    if (day === 2 && today.getUTCHours() < 22) {
+      console.warn("⚠️ ESPN still on old week; auto-advancing for odds.");
+      weekNum += 1;
+    }
+
+    console.log(`📅 Fetching odds for Week ${weekNum}`);
+
+    // Step 2: Pull live game data for that week
+    const url = `https://sports.core.api.espn.com/v2/sports/football/leagues/nfl/events?week=${weekNum}&limit=50`;
+    const res = await fetch(url, { cache: "no-store" });
+    if (!res.ok) throw new Error(`Failed to fetch ESPN odds feed (${res.status})`);
+
+    const eventsData = await res.json();
+    const games: any[] = [];
+
+    for (const e of eventsData.items || []) {
+      const eventRes = await fetch(e.$ref, { cache: "no-store" });
+      const event = await eventRes.json();
+
+      const comp = event.competitions?.[0];
+      if (!comp) continue;
+
+      const home = comp.competitors?.find((c: any) => c.homeAway === "home");
+      const away = comp.competitors?.find((c: any) => c.homeAway === "away");
+
+      const oddsData = comp.odds?.[0];
+      const spread = oddsData?.details ? parseFloat(oddsData.details.replace(/[^\d.-]/g, "")) : null;
+      const total = oddsData?.overUnder ? parseFloat(oddsData.overUnder) : null;
+
+      games.push({
+        homeTeam: home?.team?.displayName || "Unknown",
+        awayTeam: away?.team?.displayName || "Unknown",
+        spread,
+        total,
+        homeMoneyLine: oddsData?.homeMoneyLine ?? null,
+        awayMoneyLine: oddsData?.awayMoneyLine ?? null,
+      });
+    }
+
+    console.log(`✅ Pulled ${games.length} games for Week ${weekNum}`);
+
+    return NextResponse.json({
+      status: "success",
+      week: weekNum,
+      count: games.length,
+      data: games,
     });
-
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const json = await res.json();
-
-    const parsed = json.slice(0, 10).map((g: any) => ({
-      homeTeam: g.home_team,
-      awayTeam: g.away_team,
-      spread: g.bookmakers?.[0]?.markets?.[0]?.outcomes?.[0]?.point ?? "N/A",
-      total: g.bookmakers?.[0]?.markets?.find((m: any) => m.key === "totals")?.outcomes?.[0]?.point ?? "N/A",
-      homeMoneyLine: g.bookmakers?.[0]?.markets?.[1]?.outcomes?.[0]?.price ?? "N/A",
-      awayMoneyLine: g.bookmakers?.[0]?.markets?.[1]?.outcomes?.[1]?.price ?? "N/A",
-    }));
-
-    return NextResponse.json({ status: "success", count: parsed.length, data: parsed });
   } catch (err: any) {
-    console.error("Failed to fetch live odds:", err.message);
-    // Return mock odds fallback
-    const mock = [
-      { homeTeam: "49ers", awayTeam: "Chiefs", spread: -3.5, total: 48.5, homeMoneyLine: -180, awayMoneyLine: 160 },
-      { homeTeam: "Eagles", awayTeam: "Lions", spread: -2.5, total: 50.0, homeMoneyLine: -140, awayMoneyLine: 120 },
-    ];
-    return NextResponse.json({ status: "success", count: mock.length, data: mock });
+    console.error("❌ [odds] Error:", err.message);
+    return NextResponse.json({
+      status: "error",
+      message: err.message,
+      data: [],
+    });
   }
 }
