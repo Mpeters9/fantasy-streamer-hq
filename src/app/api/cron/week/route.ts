@@ -1,44 +1,27 @@
+// src/app/api/cron/week/route.ts
 import { NextResponse } from "next/server";
 
 /**
- * ESPN Current NFL Week API
- * Returns the active NFL week (used in dashboard header).
+ * Returns ESPN’s *current* regular season week.
+ * Note: we also allow ?week= to override in schedule route; this endpoint is “live”.
  */
 export async function GET() {
   try {
-    const res = await fetch(
-      "https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard",
+    const r = await fetch(
+      "https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?seasontype=2",
       { cache: "no-store" }
     );
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
+    if (!r.ok) throw new Error(`ESPN ${r.status}`);
+    const data = await r.json();
 
-    // ESPN provides the week number inside leagues[0].season
+    // ESPN typically puts week at events[0].week.number during the slate
     const week =
-      data?.leagues?.[0]?.calendar?.find((c: any) => c.entries)?.entries?.find(
-        (e: any) => e.state === "in"
-      )?.label ||
-      data?.week?.number ||
-      null;
+      data?.events?.[0]?.week?.number ??
+      data?.week?.number ??
+      0;
 
-    if (!week)
-      return NextResponse.json({
-        status: "error",
-        week: 0,
-        message: "Unable to determine current week",
-      });
-
-    console.log(`📅 [week] ESPN reports current week = ${week}`);
-    return NextResponse.json({
-      status: "success",
-      week: parseInt(week, 10),
-    });
-  } catch (err: any) {
-    console.error("❌ [week] Error:", err.message);
-    return NextResponse.json({
-      status: "error",
-      week: 0,
-      message: err.message,
-    });
+    return NextResponse.json({ status: "success", week: Number(week) });
+  } catch (e: any) {
+    return NextResponse.json({ status: "error", week: 0, message: e.message });
   }
 }

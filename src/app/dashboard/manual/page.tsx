@@ -1,169 +1,292 @@
+// src/app/dashboard/manual/page.tsx
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useMemo, useState } from "react";
+import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardContent, CardTitle } from "@/components/ui/card";
-import PlayerAutocomplete from "@/components/player-autocomplete";
-import { calculateStreamerScore } from "@/lib/scoring-engine";
+import { namesMatch, normAbbr } from "@/lib/constants";
+import { calculateScores } from "@/lib/scoring-engine";
 
-interface Player {
-  id?: string;
+type Player = {
+  id: string;
   name: string;
-  team: string;
-  position: string;
-  opponent?: string;
-  spread?: number;
-  tempF?: number;
-  windMph?: number;
-  condition?: string;
-  score?: number;
-  tier?: string;
-}
+  position: string; // QB RB WR TE K DST
+  team: string;     // Abbr like DAL
+};
+
+type Game = {
+  week: number;
+  homeTeam: string;
+  homeAbbr: string;
+  awayTeam: string;
+  awayAbbr: string;
+  total: number | null;
+  spread: number | null; // favorite’s spread (negative)
+  venue: string | null;
+  isDome: boolean;
+  start: string | null;
+};
+
+type Weather = {
+  team: string;    // Abbr
+  tempF: number;
+  windMph: number;
+  condition: number | string;
+};
 
 export default function ManualPage() {
-  const [players, setPlayers] = useState<Player[]>([]);
-  const [odds, setOdds] = useState<any[]>([]);
-  const [weather, setWeather] = useState<any[]>([]);
   const [week, setWeek] = useState<number>(0);
+  const [players, setPlayers] = useState<Player[]>([]);
+  const [schedule, setSchedule] = useState<Game[]>([]);
+  const [weather, setWeather] = useState<Weather[]>([]);
+  const [manualStats, setManualStats] = useState<any[]>([]);
+  const [search, setSearch] = useState("");
+  const [filtered, setFiltered] = useState<Player[]>([]);
+  const [selected, setSelected] = useState<any[]>([]);
+  const [mode, setMode] = useState<"streamer" | "ros">("streamer");
+  const [loading, setLoading] = useState(false);
 
-  // 🔄 Load week + odds + weather
+  // Load cache (week + schedule + players + weather)
   useEffect(() => {
     (async () => {
       try {
-        const weekRes = await fetch("/api/cron/week");
-        const weekData = await weekRes.json();
-        setWeek(weekData.week || 0);
-
-        const oddsRes = await fetch("/api/cron/odds");
-        const oddsData = await oddsRes.json();
-        setOdds(oddsData.data || []);
-
-        const weatherRes = await fetch("/api/cron/weather");
-        const weatherData = await weatherRes.json();
-        setWeather(weatherData.data || []);
-      } catch (err) {
-        console.error("❌ Initial load failed:", err);
+        const r = await fetch("/api/cron/sync");
+        const d = await r.json();
+        setWeek(d.week || 0);
+        setSchedule(d.schedule || []);
+        setPlayers(d.players || []);
+        setWeather(d.weather || []);
+        console.log("✅ Fetched data:", d);
+      } catch (e) {
+        console.error("❌ Initial load failed:", e);
       }
     })();
   }, []);
 
-  const handleSelectPlayer = (p: Player) => {
-    console.log("🎯 Selected player:", p);
+  // Load manual stats
+  useEffect(() => {
+    fetch("/api/manual-stats")
+      .then((r) => r.json())
+      .then((d) => setManualStats(d.data || []))
+      .catch(() => {});
+  }, []);
 
-    const match = odds.find(
-      (o) =>
-        o.homeTeam.toLowerCase() === p.team.toLowerCase() ||
-        o.awayTeam.toLowerCase() === p.team.toLowerCase()
+  // Filter autocomplete
+  useEffect(() => {
+    if (!search) return setFiltered([]);
+    const s = search.toLowerCase();
+    setFiltered(
+      players
+        .filter(
+          (p) =>
+            p.name.toLowerCase().includes(s) ||
+            p.team.toLowerCase().includes(s) ||
+            p.position.toLowerCase().includes(s)
+        )
+        .slice(0, 12)
     );
+  }, [search, players]);
 
-    let opponent = "N/A";
-    let spread = null;
-    if (match) {
-      const isHome = match.homeTeam.toLowerCase() === p.team.toLowerCase();
-      opponent = isHome ? match.awayTeam : match.homeTeam;
-      spread = isHome ? match.spread : match.spread * -1;
+  const weatherByTeam = useMemo(() => {
+    const map = new Map<string, Weather>();
+    weather.forEach((w) => map.set(normAbbr(w.team), w));
+    return map;
+  }, [weather]);
+
+  const findGame = (teamAbbr: string): Game | undefined => {
+    const abbr = normAbbr(teamAbbr);
+    return schedule.find(
+      (g) => normAbbr(g.homeAbbr) === abbr || normAbbr(g.awayAbbr) === abbr
+    );
+  };
+
+  const deriveMatchup = (teamAbbr: string) => {
+    const g = findGame(teamAbbr);
+    if (!g) return { opponent: "TBD", isHome: false, spread: null, total: null, implied: null, isDome: false };
+
+    const abbr = normAbbr(teamAbbr);
+    const isHome = normAbbr(g.homeAbbr) === abbr;
+    const opponent = isHome ? g.awayAbbr : g.homeAbbr;
+
+    // Flip favorite spread to the player’s team perspective.
+    // If ESPN spread is the favorite's negative: 
+    //   - For favorite team: spread stays (negative)
+    //   - For underdog team: spread -> positive of abs
+    let spread: number | null = null;
+    if (typeof g.spread === "number") {
+      const favoriteIsHome = g.spread < 0; // ESPN negative spread typically indicates the favorite side
+      const playerIsFavorite = (favoriteIsHome && isHome) || (!favoriteIsHome && !isHome);
+      spread = playerIsFavorite ? g.spread : Math.abs(g.spread);
     }
 
-    const w = weather.find(
-      (w) => w.team.toLowerCase() === p.team.toLowerCase()
-    );
+    const total = typeof g.total === "number" ? g.total : null;
 
-    const playerData: Player = {
-      ...p,
+    // Implied points (simple approximation if total+spread present)
+    let implied: number | null = null;
+    if (total !== null && spread !== null) {
+      // If spread is negative, player is favorite -> implied = total/2 - spread/2
+      // If spread is positive, player is underdog -> implied = total/2 - (+spread)/2 == total/2 - spread/2
+      implied = +(total / 2 - spread / 2).toFixed(1);
+    }
+
+    return {
       opponent,
+      isHome,
       spread,
-      tempF: w?.tempF,
-      windMph: w?.windMph,
-      condition:
-        w?.condition === 0
-          ? "Clear"
-          : w?.condition === 3
-          ? "Rain"
-          : "Other",
+      total,
+      implied,
+      isDome: !!g.isDome,
     };
-
-    const { score, tier } = calculateStreamerScore(playerData);
-    setPlayers((prev) => [...prev, { ...playerData, score, tier }]);
   };
 
-  const handleForceRefresh = async () => {
+  const selectPlayer = (p: Player) => {
+    const m = deriveMatchup(p.team);
+    const w = weatherByTeam.get(normAbbr(p.team));
+    setSelected((prev) => [
+      ...prev,
+      {
+        ...p,
+        opponent: m.opponent,
+        isHome: m.isHome,
+        spread: m.spread,
+        total: m.total,
+        impliedPts: m.implied,
+        isDome: m.isDome,
+        weather: w
+          ? `${Math.round(w.tempF)}°F, wind ${Math.round(w.windMph)} mph, code ${w.condition}`
+          : "N/A",
+      },
+    ]);
+    setSearch("");
+    setFiltered([]);
+  };
+
+  const removePlayer = (idx: number) => {
+    setSelected((prev) => prev.filter((_, i) => i !== idx));
+  };
+
+  const forceRefresh = async () => {
+    setLoading(true);
     try {
-      console.log("🔁 Forcing refresh...");
-      const weekRes = await fetch("/api/cron/week");
-      const weekData = await weekRes.json();
-      setWeek(weekData.week || 0);
-
-      const oddsRes = await fetch("/api/cron/odds");
-      const oddsData = await oddsRes.json();
-      setOdds(oddsData.data || []);
-
-      const weatherRes = await fetch("/api/cron/weather");
-      const weatherData = await weatherRes.json();
-      setWeather(weatherData.data || []);
-
-      console.log("✅ Refreshed data successfully");
-    } catch (err) {
-      console.error("❌ Refresh failed:", err);
+      // re-sync (which pulls live week, then that week’s schedule)
+      const d = await fetch("/api/cron/sync", { cache: "no-store" }).then((r) => r.json());
+      setWeek(d.week || 0);
+      setSchedule(d.schedule || []);
+      setPlayers(d.players || []);
+      setWeather(d.weather || []);
+      alert(`✅ Synced Week ${d.week}`);
+    } catch (e) {
+      alert("❌ Refresh failed");
+    } finally {
+      setLoading(false);
     }
   };
 
-  const getTierColor = (tier: string | undefined) => {
-    switch (tier) {
-      case "S": return "bg-green-600 text-white";
-      case "A": return "bg-blue-600 text-white";
-      case "B": return "bg-yellow-500 text-black";
-      case "C": return "bg-purple-600 text-white";
-      case "D": return "bg-red-600 text-white";
-      default: return "bg-gray-600 text-white";
-    }
-  };
+  const getStats = (name: string) =>
+    manualStats.find((m) => m.playerName === name) || {};
 
   return (
-    <div className="p-6 space-y-6 min-h-screen bg-neutral-900 text-neutral-50">
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold">Fantasy Streamer HQ</h1>
-        <div className="flex items-center gap-4">
-          <span className="text-lg">🏈 Week {week || "–"}</span>
-          <Button
-            onClick={handleForceRefresh}
-            className="bg-amber-500 hover:bg-amber-600 text-black"
-          >
-            Force Data Refresh
+    <div className="max-w-7xl mx-auto">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-3xl font-bold text-blue-400">
+          Waiver Dashboard — Week {week}
+        </h1>
+        <div className="flex gap-3">
+          <Button onClick={forceRefresh} disabled={loading}>
+            {loading ? "🔄 Refreshing..." : "♻️ Force Data Refresh"}
+          </Button>
+          <Button onClick={() => setMode((m) => (m === "streamer" ? "ros" : "streamer"))}>
+            {mode === "streamer" ? "Switch to ROS" : "Switch to Streamer"}
           </Button>
         </div>
       </div>
 
-      <Card className="bg-neutral-800 border border-neutral-700 shadow-xl">
-        <CardHeader>
-          <CardTitle className="text-xl text-white">Add Player</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <PlayerAutocomplete onSelect={handleSelectPlayer} />
-        </CardContent>
-      </Card>
-
-      <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {players.map((p, i) => (
-          <Card key={i} className="bg-neutral-800 border border-neutral-700 shadow-lg">
-            <CardHeader className="flex justify-between items-center">
-              <CardTitle className="text-white">
-                {p.name} ({p.position})
-              </CardTitle>
-              <span
-                className={`px-3 py-1 rounded-full text-sm font-bold ${getTierColor(p.tier)}`}
+      {/* Search */}
+      <div className="relative mb-6">
+        <Input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search player…"
+          className="bg-gray-800 text-gray-100"
+        />
+        {!!filtered.length && (
+          <div className="absolute z-20 w-full bg-gray-900 border border-gray-700 rounded mt-1 max-h-64 overflow-y-auto">
+            {filtered.map((p) => (
+              <div
+                key={p.id}
+                className="p-2 hover:bg-gray-700 cursor-pointer"
+                onClick={() => selectPlayer(p)}
               >
-                {p.tier}
-              </span>
-            </CardHeader>
-            <CardContent className="space-y-1 text-sm text-neutral-200">
-              <p><strong>Team:</strong> {p.team}</p>
-              <p><strong>Opponent:</strong> {p.opponent}</p>
-              <p><strong>Spread:</strong> {p.spread ? `${p.spread > 0 ? "+" : ""}${p.spread}` : "N/A"}</p>
-              <p><strong>Weather:</strong> {p.condition} ({p.tempF?.toFixed(1)}°F, {p.windMph?.toFixed(1)} mph)</p>
-              <p><strong>Streamer Score:</strong> <span className="font-bold text-amber-400">{p.score}</span></p>
-            </CardContent>
-          </Card>
-        ))}
+                {p.name} <span className="text-gray-400">({p.team} — {p.position})</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Cards */}
+      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        {selected.map((p, idx) => {
+          const ms = getStats(p.name);
+          const score = calculateScores({
+            position: p.position,
+            fantasyPointsLast3: Number(ms.fantasyPointsLast3 || 0),
+            targetShare: Number(ms.targetShare || 0),
+            snapShare: Number(ms.snapShare || 0),
+            yardsPerRouteRun: Number(ms.yardsPerRouteRun || 0),
+            totalPoints: Number(p.total ?? 45),
+          });
+
+          const tier =
+            mode === "streamer" ? score.tierStreamer : score.tierROS;
+          const badge =
+            tier === "S" ? "🟩 S" :
+            tier === "A" ? "🟩 A" :
+            tier === "B" ? "🟨 B" :
+            tier === "C" ? "🟨 C" :
+            "🟥 D";
+
+          return (
+            <Card key={`${p.name}-${idx}`} className="bg-gray-800/60 border border-gray-700 text-gray-100">
+              <CardHeader className="flex-row items-center justify-between">
+                <CardTitle className="flex items-center justify-between w-full">
+                  <span>{p.name} ({p.team} — {p.position})</span>
+                  <span className="text-xs px-2 py-1 bg-gray-700 rounded">
+                    {mode === "streamer" ? "Streamer Mode" : "ROS Mode"} • {badge}
+                  </span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="text-sm space-y-1">
+                <div><b>Opponent:</b> {p.opponent}</div>
+                <div><b>Spread:</b> {p.spread ?? "—"}</div>
+                <div><b>Total:</b> {p.total ?? "—"}</div>
+                <div><b>Implied Pts:</b> {p.impliedPts ?? "—"}</div>
+                <div><b>Dome:</b> {p.isDome ? "Yes" : "No"}</div>
+                <div><b>Weather:</b> {p.weather}</div>
+                <div className="pt-2 border-t border-gray-700">
+                  <b>Score:</b>{" "}
+                  {mode === "streamer"
+                    ? score.streamerScore.toFixed(1)
+                    : score.rosScore.toFixed(1)}{" "}
+                  <span className="opacity-80">({tier})</span>
+                </div>
+                <div className="pt-1 text-xs text-gray-400">
+                  ({mode === "streamer" ? "Last 3 + matchup weight" : "Last 3 + skill/stable weight"})
+                </div>
+                <div className="pt-2 flex justify-end">
+                  <button
+                    className="bg-red-600 px-2 py-1 rounded"
+                    onClick={() => removePlayer(idx)}
+                  >
+                    Remove
+                  </button>
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })}
       </div>
     </div>
   );
