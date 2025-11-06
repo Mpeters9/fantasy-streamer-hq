@@ -1,18 +1,16 @@
 [
   {
-    "playerName": "Quinshon Judkins",
+    "playerName": "Kenneth Walker III",
     "position": "RB",
-    "team": "CLE",
-    "fantasyPointsLast3": "1",
-    "rushShare": "4",
-    "targetShare": "5",
-    "snapShare": "5",
-    "redZoneTouches": "5",
-    "goalLineCarries": "5"
-  },
-  {
-    "playerName": "CeeDee Lamb",
-    "position": "WR",
-    "team": "DAL"
+    "team": "SEA",
+    "fantasyPointsLast3": "34511",
+    "rushShare": "4214124",
+    "targetShare": "1251235",
+    "snapShare": "35235",
+    "twoMinRole": "325",
+    "oppExplosiveRush": "23532",
+    "goalLineCarries": "5325",
+    "redZoneTouches": "235532",
+    "thirdDownRole": "2355325"
   }
 ]

@@ -1,0 +1,46 @@
+[
+  {
+    "id": "4685702",
+    "name": "Quinshon Judkins",
+    "team": "CLE",
+    "position": "RB",
+    "opponent": "NYJ",
+    "spread": "2.5",
+    "impliedPts": "20.0",
+    "weather": "N/A",
+    "headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4685702.png"
+  },
+  {
+    "id": "4241389",
+    "name": "CeeDee Lamb",
+    "team": "DAL",
+    "position": "WR",
+    "opponent": "TBD",
+    "spread": "0.0",
+    "impliedPts": "N/A",
+    "weather": "N/A",
+    "headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4241389.png"
+  },
+  {
+    "id": "4040761",
+    "name": "Devin Singletary",
+    "team": "NYG",
+    "position": "RB",
+    "opponent": "CHI",
+    "spread": "4.5",
+    "impliedPts": "25.5",
+    "weather": "N/A",
+    "headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4040761.png"
+  },
+  {
+    "id": "4567048",
+    "name": "Kenneth Walker III",
+    "team": "SEA",
+    "position": "RB",
+    "opponent": "ARI",
+    "spread": "-6.5",
+    "impliedPts": "19.5",
+    "weather": "N/A",
+    "headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4567048.png"
+  }
+]

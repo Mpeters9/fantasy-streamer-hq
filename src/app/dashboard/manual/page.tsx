@@ -6,123 +6,100 @@ interface Player {
   name: string;
   position: string;
   team: string;
-  opponent?: string;
-  spread?: string;
-  weather?: string;
-  impliedPts?: number;
+  opponent: string;
+  spread: string;
+  impliedPts: string;
+  weather: string;
   headshot?: string;
-  score?: number;
 }
 
 export default function ManualDashboard() {
   const [week, setWeek] = useState<number | null>(null);
-  const [loading, setLoading] = useState(false);
   const [players, setPlayers] = useState<Player[]>([]);
+  const [added, setAdded] = useState<Player[]>([]);
   const [search, setSearch] = useState("");
-  const [selected, setSelected] = useState<Player | null>(null);
-  const [syncStatus, setSyncStatus] = useState<string>("Not synced");
+  const [loading, setLoading] = useState(false);
+  const [status, setStatus] = useState("Idle");
 
-  const syncData = async () => {
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const res = await fetch("/api/cron/sync");
+        const data = await res.json();
+        const list = data.snapshot?.players || [];
+        setPlayers(list);
+        setWeek(data.week);
+        setStatus(`✅ Week ${data.week} loaded`);
+      } catch (err) {
+        console.error(err);
+        setStatus("❌ Load failed");
+      }
+      try {
+        const res2 = await fetch("/api/manual-players");
+        const d2 = await res2.json();
+        setAdded(d2.data || []);
+      } catch {}
+    };
+    load();
+  }, []);
+
+  const forceRefresh = async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/cron/sync");
+      const res = await fetch("/api/cron/sync?force=true");
       const data = await res.json();
-      setWeek(data.week);
       setPlayers(data.snapshot?.players || []);
-      setSyncStatus(`✅ Synced for Week ${data.week} (${data.count} players)`);
-    } catch (e: any) {
-      console.error("❌ Sync error:", e);
-      setSyncStatus("❌ Sync failed – try again");
+      setWeek(data.week);
+      setStatus(`✅ Refreshed for Week ${data.week}`);
+    } catch (err) {
+      console.error(err);
+      setStatus("❌ Refresh failed");
     } finally {
       setLoading(false);
     }
   };
 
-  const loadPlayers = async () => {
-    try {
-      const res = await fetch("/api/cron/players");
-      const data = await res.json();
-      setPlayers(data.data || []);
-    } catch (e) {
-      console.error("Player load failed:", e);
-    }
-  };
-
-  useEffect(() => {
-    loadPlayers();
-  }, []);
-
-  const handleSelect = async (player: Player) => {
-    setSearch(player.name);
-    setSelected(null);
-    try {
-      const [weatherRes, oddsRes] = await Promise.all([
-        fetch("/api/cron/weather").then((r) => r.json()),
-        fetch("/api/cron/odds").then((r) => r.json()),
-      ]);
-
-      const weather = weatherRes.data.find(
-        (w: any) => w.team === player.team
-      );
-      const game = oddsRes.data.find(
-        (g: any) => g.homeTeam === player.team || g.awayTeam === player.team
-      );
-
-      const opponent =
-        game?.homeTeam === player.team ? game?.awayTeam : game?.homeTeam;
-      const spread =
-        game?.homeTeam === player.team
-          ? game.spread
-          : game.spread
-          ? -1 * game.spread
-          : "N/A";
-      const impliedPts = game?.total
-        ? (game.total / 2 + (spread as number) / 2).toFixed(1)
-        : "N/A";
-
-      const playerData = {
-        ...player,
-        opponent,
-        spread: typeof spread === "number" ? spread.toFixed(1) : spread,
-        impliedPts,
-        weather: weather
-          ? `${weather.tempF.toFixed(0)}°F, Wind ${weather.windMph.toFixed(
-              0
-            )} mph`
-          : "Indoor/Dome",
-        headshot: `https://a.espncdn.com/i/headshots/nfl/players/full/${player.id}.png`,
-      };
-
-      setSelected(playerData);
-    } catch (e) {
-      console.error("Failed to load player details:", e);
-    }
-  };
-
-  const filteredPlayers =
+  const filtered =
     search.length > 1
       ? players.filter((p) =>
           p.name.toLowerCase().includes(search.toLowerCase())
         )
       : [];
 
+  const addPlayer = async (player: Player) => {
+    setSearch("");
+    const newList = [...added, player];
+    setAdded(newList);
+    await fetch("/api/manual-players", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(player),
+    });
+  };
+
+  const removePlayer = async (id: string) => {
+    const res = await fetch("/api/manual-players", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id }),
+    });
+    const data = await res.json();
+    setAdded(data.data || []);
+  };
+
   return (
-    <div className="min-h-screen bg-gray-900 text-gray-100 flex flex-col gap-6">
+    <div className="min-h-screen bg-gray-900 text-gray-100 p-6 space-y-6">
       <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-white">🧾 Manual Dashboard</h1>
+          <h1 className="text-3xl font-bold">🧾 Manual Dashboard</h1>
           <p className="text-gray-400 mt-1">
-            Current Week:{" "}
-            <span className="font-semibold text-blue-400">
-              {week ? week : "–"}
-            </span>
+            Week {week ?? "-"} • {status}
           </p>
         </div>
-
         <button
-          onClick={syncData}
+          onClick={forceRefresh}
           disabled={loading}
-          className={`mt-4 sm:mt-0 px-4 py-2 rounded text-white shadow transition-colors ${
+          className={`px-4 py-2 rounded text-white shadow ${
             loading
               ? "bg-gray-600 cursor-wait"
               : "bg-blue-600 hover:bg-blue-700 cursor-pointer"
@@ -132,76 +109,69 @@ export default function ManualDashboard() {
         </button>
       </header>
 
-      <div
-        className={`rounded-lg p-4 border ${
-          syncStatus.startsWith("✅")
-            ? "border-green-400 bg-green-900/20"
-            : syncStatus.startsWith("❌")
-            ? "border-red-400 bg-red-900/20"
-            : "border-gray-700 bg-gray-800"
-        } text-gray-200`}
-      >
-        {syncStatus}
+      <div className="bg-gray-800 p-4 rounded-lg shadow">
+        <input
+          type="text"
+          placeholder="Search player..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-gray-100 focus:ring-2 focus:ring-blue-500"
+        />
+        {filtered.length > 0 && (
+          <div className="mt-2 bg-gray-900 border border-gray-700 rounded max-h-60 overflow-y-auto">
+            {filtered.slice(0, 15).map((p) => (
+              <div
+                key={p.id}
+                className="p-2 hover:bg-gray-700 cursor-pointer"
+                onClick={() => addPlayer(p)}
+              >
+                {p.name} • {p.team} ({p.position})
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
-      <section className="bg-gray-800 rounded-xl border border-gray-700 p-6 shadow-lg">
-        <h2 className="text-xl font-semibold mb-4">Search Players</h2>
-
-        <div className="relative mb-6">
-          <input
-            type="text"
-            placeholder="🔍 Type a player name..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="bg-gray-900 border border-gray-700 text-gray-100 px-3 py-2 rounded-md w-full focus:ring-2 focus:ring-blue-500 outline-none"
-          />
-          {filteredPlayers.length > 0 && (
-            <div className="absolute z-10 bg-gray-800 border border-gray-700 mt-1 w-full max-h-64 overflow-y-auto rounded-md shadow-lg">
-              {filteredPlayers.slice(0, 10).map((p) => (
-                <div
-                  key={p.id}
-                  className="p-2 hover:bg-gray-700 cursor-pointer"
-                  onClick={() => handleSelect(p)}
-                >
-                  {p.name} • {p.team} ({p.position})
+      {added.length > 0 && (
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {added.map((p) => (
+            <div
+              key={p.id}
+              className="bg-gray-800 border border-gray-700 rounded-lg p-4 shadow space-y-2"
+            >
+              <div className="flex items-center gap-3">
+                <img
+                  src={p.headshot}
+                  alt={p.name}
+                  onError={(e) =>
+                    ((e.target as HTMLImageElement).src =
+                      "https://a.espncdn.com/i/headshots/nophoto.png")
+                  }
+                  className="w-14 h-14 rounded-full border border-gray-600"
+                />
+                <div>
+                  <h2 className="text-lg font-semibold text-white">{p.name}</h2>
+                  <p className="text-gray-400 text-sm">
+                    {p.team} • {p.position}
+                  </p>
                 </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {selected ? (
-          <div className="rounded-lg bg-gray-900 border border-gray-700 p-4 flex items-center gap-4 shadow-inner">
-            <img
-              src={selected.headshot}
-              onError={(e) =>
-                ((e.target as HTMLImageElement).src =
-                  "https://a.espncdn.com/i/headshots/nophoto.png")
-              }
-              alt={selected.name}
-              className="w-16 h-16 rounded-full border border-gray-600 object-cover"
-            />
-            <div className="flex-1">
-              <h3 className="text-lg font-semibold text-white">
-                {selected.name}
-              </h3>
-              <p className="text-gray-400">
-                {selected.team} • {selected.position}
-              </p>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-2 text-sm">
-                <p>Opponent: {selected.opponent || "TBD"}</p>
-                <p>Spread: {selected.spread || "N/A"}</p>
-                <p>Weather: {selected.weather}</p>
-                <p>Implied Pts: {selected.impliedPts}</p>
               </div>
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                <p>Opponent: {p.opponent}</p>
+                <p>Spread: {p.spread}</p>
+                <p>Implied: {p.impliedPts}</p>
+                <p>Weather: {p.weather}</p>
+              </div>
+              <button
+                onClick={() => removePlayer(p.id)}
+                className="w-full bg-red-600 hover:bg-red-700 text-white text-sm rounded py-1"
+              >
+                ✖ Remove
+              </button>
             </div>
-          </div>
-        ) : (
-          <p className="text-gray-400 text-sm">
-            Select a player to view matchup data.
-          </p>
-        )}
-      </section>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
