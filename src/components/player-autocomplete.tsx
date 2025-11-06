@@ -1,12 +1,12 @@
 "use client";
-
 import React, { useState, useEffect } from "react";
 
 interface Player {
-  id: string;
+  id?: string;
   name: string;
-  position: string;
   team: string;
+  position: string;
+  headshot?: string;
 }
 
 interface Props {
@@ -14,63 +14,75 @@ interface Props {
 }
 
 export default function PlayerAutocomplete({ onSelect }: Props) {
-  const [players, setPlayers] = useState<Player[]>([]);
   const [query, setQuery] = useState("");
+  const [players, setPlayers] = useState<Player[]>([]);
   const [filtered, setFiltered] = useState<Player[]>([]);
-  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    const loadPlayers = async () => {
-      setLoading(true);
+    const load = async () => {
       try {
-        const res = await fetch("/api/cron/players");
-        const data = await res.json();
-        if (data.status === "success") setPlayers(data.data || []);
-      } catch (err) {
-        console.error("❌ Failed to fetch players:", err);
+        const res = await fetch("/api/cron/sync", { cache: "no-store" });
+        const d = await res.json();
+        if (d?.players?.length) setPlayers(d.players);
+        else {
+          const r = await fetch("/api/cron/players");
+          const f = await r.json();
+          setPlayers(f.data || []);
+        }
+      } catch {
+        console.warn("Failed to load players");
       }
-      setLoading(false);
     };
-    loadPlayers();
+    load();
   }, []);
 
   useEffect(() => {
-    if (!query.trim()) return setFiltered([]);
-    const q = query.toLowerCase();
-    setFiltered(
-      players
-        .filter((p) => p.name.toLowerCase().includes(q))
-        .slice(0, 8)
-    );
+    if (!query.trim()) setFiltered([]);
+    else {
+      const q = query.toLowerCase();
+      setFiltered(
+        players.filter(
+          (p) =>
+            p.name.toLowerCase().includes(q) ||
+            p.team.toLowerCase().includes(q)
+        )
+      );
+    }
   }, [query, players]);
-
-  const handleSelect = (p: Player) => {
-    setQuery(p.name);
-    setFiltered([]);
-    onSelect(p);
-  };
 
   return (
     <div className="relative w-full">
       <input
-        type="text"
-        className="w-full px-3 py-2 rounded bg-neutral-700 text-white placeholder:text-neutral-400"
-        placeholder={loading ? "Loading players..." : "Search player..."}
         value={query}
         onChange={(e) => setQuery(e.target.value)}
+        placeholder="Search player..."
+        className="w-full p-2 rounded bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-700"
       />
       {filtered.length > 0 && (
-        <ul className="absolute z-20 bg-neutral-800 border border-neutral-700 w-full rounded mt-1 max-h-60 overflow-y-auto">
+        <ul className="absolute z-20 bg-white dark:bg-gray-800 w-full rounded shadow max-h-48 overflow-y-auto">
           {filtered.map((p) => (
             <li
-              key={p.id}
-              className="p-2 hover:bg-neutral-700 cursor-pointer flex justify-between"
-              onClick={() => handleSelect(p)}
+              key={p.id ?? p.name}
+              onClick={() => {
+                onSelect(p);
+                setQuery(p.name);
+                setFiltered([]);
+              }}
+              className="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 cursor-pointer"
             >
-              <span>
-                {p.name} <span className="text-neutral-400">({p.position})</span>
-              </span>
-              <span className="text-neutral-300">{p.team}</span>
+              <div className="flex items-center gap-2">
+                {p.headshot && (
+                  <img
+                    src={p.headshot}
+                    alt={p.name}
+                    className="w-6 h-6 rounded-full object-cover"
+                  />
+                )}
+                <span>{p.name}</span>
+                <span className="text-xs text-gray-500">
+                  {p.team} • {p.position}
+                </span>
+              </div>
             </li>
           ))}
         </ul>

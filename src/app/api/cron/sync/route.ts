@@ -1,52 +1,75 @@
 // src/app/api/cron/sync/route.ts
 import { NextResponse } from "next/server";
-import fs from "fs";
-import path from "path";
 
-/**
- * Unified cache sync:
- *  - current week
- *  - schedule for that week
- *  - players (fantasy-relevant)
- *  - weather (your existing endpoint)
- *
- * NOTE: Odds are now embedded in schedule when ESPN provides them.
- */
 export async function GET() {
-  const cachePath = path.join(process.cwd(), "tmp", "fshq-cache.json");
-  const tmpDir = path.dirname(cachePath);
-  if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir, { recursive: true });
-
   try {
-    // Fetch live week then fetch that specific week's schedule so it's deterministic
-    const weekRes = await fetch("http://localhost:3000/api/cron/week", { cache: "no-store" });
-    const weekJson = await weekRes.json();
-    const liveWeek = weekJson?.week || 0;
+    const boardRes = await fetch(
+      "https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?seasontype=2",
+      { cache: "no-store" }
+    );
+    const board = await boardRes.json();
+    let week = board?.week?.number ?? 0;
 
-    const [playersR, schedR, weatherR] = await Promise.allSettled([
-      fetch("http://localhost:3000/api/cron/players", { cache: "no-store" }),
-      fetch(`http://localhost:3000/api/cron/schedule?week=${liveWeek}`, { cache: "no-store" }),
-      fetch("http://localhost:3000/api/cron/weather", { cache: "no-store" }),
+    const events = board?.events || [];
+    const allFinal = events.every((e: any) =>
+      e?.competitions?.[0]?.status?.type?.completed
+    );
+    if (allFinal) week += 1;
+
+    // Schedule
+    const schedRes = await fetch(
+      `https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?seasontype=2&week=${week}`,
+      { cache: "no-store" }
+    );
+    const sched = await schedRes.json();
+
+    const schedule = (sched.events || []).map((g: any) => {
+      const c = g.competitions?.[0];
+      const home = c?.competitors?.find((x: any) => x.homeAway === "home");
+      const away = c?.competitors?.find((x: any) => x.homeAway === "away");
+      return {
+        week,
+        homeTeam: home?.team?.displayName,
+        homeAbbr: home?.team?.abbreviation,
+        awayTeam: away?.team?.displayName,
+        awayAbbr: away?.team?.abbreviation,
+        start: c?.date ?? null,
+        venue: c?.venue?.fullName ?? null,
+        isDome: /dome|indoor/i.test(c?.venue?.fullName ?? ""),
+      };
+    });
+
+    // Odds & weather
+    const [odds, weather, playersRes] = await Promise.all([
+      fetch(`/api/cron/odds`, { cache: "no-store" }).then((r) => r.json()).catch(() => ({ data: [] })),
+      fetch(`/api/cron/weather`, { cache: "no-store" }).then((r) => r.json()).catch(() => ({ data: [] })),
+      fetch(`/api/cron/players`, { cache: "no-store" }).then((r) => r.json()).catch(() => ({ data: [] })),
     ]);
 
-    const toJson = async (p: any) => (p.status === "fulfilled" ? p.value.json() : { data: [] });
+    // Normalize players
+    const players =
+      playersRes.data?.map((p: any) => ({
+        id: p.id,
+        name: p.name,
+        team: p.team,
+        position: p.position,
+        headshot: p.headshot,
+      })) ?? [];
 
-    const players = await toJson(playersR);
-    const schedule = await toJson(schedR);
-    const weather = await toJson(weatherR);
-
-    const payload = {
+    return NextResponse.json({
       status: "success",
       fetchedAt: new Date().toISOString(),
-      week: schedule.week || liveWeek || 0,
-      schedule: schedule.data || [],
-      players: players.data || [],
-      weather: weather.data || [],
-    };
-
-    fs.writeFileSync(cachePath, JSON.stringify(payload, null, 2));
-    return NextResponse.json(payload);
-  } catch (e: any) {
-    return NextResponse.json({ status: "error", message: e.message });
+      week,
+      schedule,
+      odds: odds.data ?? [],
+      weather: weather.data ?? [],
+      players,
+    });
+  } catch (err: any) {
+    return NextResponse.json({
+      status: "error",
+      message: err.message,
+      data: [],
+    });
   }
 }

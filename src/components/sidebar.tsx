@@ -10,6 +10,22 @@ const navItems = [
   { label: "Weather Feed", href: "/api/cron/weather" },
 ];
 
+
+<a
+  href="/dashboard/snapshots"
+  className="block px-4 py-2 hover:bg-gray-800 rounded-md text-sm"
+>
+  🗓️ Weekly Snapshots
+</a>
+
+<a
+  href="/dashboard/waivers"
+  className="block px-4 py-2 hover:bg-gray-800 rounded-md text-sm"
+>
+  🧮 Waiver Recommendations
+</a>
+
+
 export default function Sidebar() {
   const path = usePathname();
   return (
@@ -32,3 +48,10 @@ export default function Sidebar() {
     </aside>
   );
 }
+<a
+  href="/dashboard/compare"
+  className="block px-4 py-2 hover:bg-gray-800 rounded-md text-sm"
+>
+  🔍 Player Comparison
+</a>
+

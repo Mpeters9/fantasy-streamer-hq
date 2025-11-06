@@ -2,8 +2,8 @@
 import { NextResponse } from "next/server";
 
 /**
- * Returns ESPN’s *current* regular season week.
- * Note: we also allow ?week= to override in schedule route; this endpoint is “live”.
+ * Returns the "live" NFL week from ESPN.
+ * Used as default when no override selected in the UI.
  */
 export async function GET() {
   try {
@@ -11,10 +11,7 @@ export async function GET() {
       "https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?seasontype=2",
       { cache: "no-store" }
     );
-    if (!r.ok) throw new Error(`ESPN ${r.status}`);
     const data = await r.json();
-
-    // ESPN typically puts week at events[0].week.number during the slate
     const week =
       data?.events?.[0]?.week?.number ??
       data?.week?.number ??

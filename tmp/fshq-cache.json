@@ -1,175 +1,175 @@
 {
   "status": "success",
-  "fetchedAt": "2025-11-05T03:52:58.990Z",
-  "week": 9,
+  "fetchedAt": "2025-11-05T14:03:08.157Z",
+  "week": 10,
   "schedule": [
     {
-      "week": 9,
-      "homeTeam": "Miami Dolphins",
-      "homeAbbr": "MIA",
-      "awayTeam": "Baltimore Ravens",
-      "awayAbbr": "BAL",
-      "total": null,
-      "spread": null,
-      "venue": "Hard Rock Stadium",
+      "week": 10,
+      "homeTeam": "Denver Broncos",
+      "homeAbbr": "DEN",
+      "awayTeam": "Las Vegas Raiders",
+      "awayAbbr": "LV",
+      "total": 42.5,
+      "spread": -8.5,
+      "venue": "Empower Field at Mile High",
       "isDome": false,
-      "start": "2025-10-31T00:15Z"
+      "start": "2025-11-07T01:15Z"
     },
     {
-      "week": 9,
-      "homeTeam": "Cincinnati Bengals",
-      "homeAbbr": "CIN",
-      "awayTeam": "Chicago Bears",
-      "awayAbbr": "CHI",
-      "total": null,
-      "spread": null,
-      "venue": "Paycor Stadium",
-      "isDome": false,
-      "start": "2025-11-02T18:00Z"
-    },
-    {
-      "week": 9,
-      "homeTeam": "Detroit Lions",
-      "homeAbbr": "DET",
-      "awayTeam": "Minnesota Vikings",
-      "awayAbbr": "MIN",
-      "total": null,
-      "spread": null,
-      "venue": "Ford Field",
-      "isDome": true,
-      "start": "2025-11-02T18:00Z"
-    },
-    {
-      "week": 9,
-      "homeTeam": "Green Bay Packers",
-      "homeAbbr": "GB",
-      "awayTeam": "Carolina Panthers",
-      "awayAbbr": "CAR",
-      "total": null,
-      "spread": null,
-      "venue": "Lambeau Field",
-      "isDome": false,
-      "start": "2025-11-02T18:00Z"
-    },
-    {
-      "week": 9,
-      "homeTeam": "Tennessee Titans",
-      "homeAbbr": "TEN",
-      "awayTeam": "Los Angeles Chargers",
-      "awayAbbr": "LAC",
-      "total": null,
-      "spread": null,
-      "venue": "Nissan Stadium",
-      "isDome": false,
-      "start": "2025-11-02T18:00Z"
-    },
-    {
-      "week": 9,
-      "homeTeam": "New England Patriots",
-      "homeAbbr": "NE",
+      "week": 10,
+      "homeTeam": "Indianapolis Colts",
+      "homeAbbr": "IND",
       "awayTeam": "Atlanta Falcons",
       "awayAbbr": "ATL",
-      "total": null,
-      "spread": null,
-      "venue": "Gillette Stadium",
+      "total": 48.5,
+      "spread": -6.5,
+      "venue": "Olympic Stadium Berlin",
       "isDome": false,
-      "start": "2025-11-02T18:00Z"
+      "start": "2025-11-09T14:30Z"
     },
     {
-      "week": 9,
-      "homeTeam": "New York Giants",
-      "homeAbbr": "NYG",
-      "awayTeam": "San Francisco 49ers",
-      "awayAbbr": "SF",
-      "total": null,
-      "spread": null,
+      "week": 10,
+      "homeTeam": "Chicago Bears",
+      "homeAbbr": "CHI",
+      "awayTeam": "New York Giants",
+      "awayAbbr": "NYG",
+      "total": 47.5,
+      "spread": -3.5,
+      "venue": "Soldier Field",
+      "isDome": false,
+      "start": "2025-11-09T18:00Z"
+    },
+    {
+      "week": 10,
+      "homeTeam": "Miami Dolphins",
+      "homeAbbr": "MIA",
+      "awayTeam": "Buffalo Bills",
+      "awayAbbr": "BUF",
+      "total": 50.5,
+      "spread": 9.5,
+      "venue": "Hard Rock Stadium",
+      "isDome": false,
+      "start": "2025-11-09T18:00Z"
+    },
+    {
+      "week": 10,
+      "homeTeam": "Minnesota Vikings",
+      "homeAbbr": "MIN",
+      "awayTeam": "Baltimore Ravens",
+      "awayAbbr": "BAL",
+      "total": 48.5,
+      "spread": 4.5,
+      "venue": "U.S. Bank Stadium",
+      "isDome": true,
+      "start": "2025-11-09T18:00Z"
+    },
+    {
+      "week": 10,
+      "homeTeam": "New York Jets",
+      "homeAbbr": "NYJ",
+      "awayTeam": "Cleveland Browns",
+      "awayAbbr": "CLE",
+      "total": 37.5,
+      "spread": 2.5,
       "venue": "MetLife Stadium",
       "isDome": false,
-      "start": "2025-11-02T18:00Z"
+      "start": "2025-11-09T18:00Z"
     },
     {
-      "week": 9,
-      "homeTeam": "Pittsburgh Steelers",
-      "homeAbbr": "PIT",
-      "awayTeam": "Indianapolis Colts",
-      "awayAbbr": "IND",
-      "total": null,
-      "spread": null,
-      "venue": "Acrisure Stadium",
+      "week": 10,
+      "homeTeam": "Tampa Bay Buccaneers",
+      "homeAbbr": "TB",
+      "awayTeam": "New England Patriots",
+      "awayAbbr": "NE",
+      "total": 48.5,
+      "spread": -2.5,
+      "venue": "Raymond James Stadium",
       "isDome": false,
-      "start": "2025-11-02T18:00Z"
+      "start": "2025-11-09T18:00Z"
     },
     {
-      "week": 9,
-      "homeTeam": "Houston Texans",
-      "homeAbbr": "HOU",
-      "awayTeam": "Denver Broncos",
-      "awayAbbr": "DEN",
-      "total": null,
-      "spread": null,
-      "venue": "NRG Stadium",
-      "isDome": true,
-      "start": "2025-11-02T18:00Z"
-    },
-    {
-      "week": 9,
-      "homeTeam": "Las Vegas Raiders",
-      "homeAbbr": "LV",
-      "awayTeam": "Jacksonville Jaguars",
-      "awayAbbr": "JAX",
-      "total": null,
-      "spread": null,
-      "venue": "Allegiant Stadium",
-      "isDome": true,
-      "start": "2025-11-02T21:05Z"
-    },
-    {
-      "week": 9,
-      "homeTeam": "Los Angeles Rams",
-      "homeAbbr": "LAR",
+      "week": 10,
+      "homeTeam": "Carolina Panthers",
+      "homeAbbr": "CAR",
       "awayTeam": "New Orleans Saints",
       "awayAbbr": "NO",
-      "total": null,
-      "spread": null,
-      "venue": "SoFi Stadium",
+      "total": 39.5,
+      "spread": -5.5,
+      "venue": "Bank of America Stadium",
+      "isDome": false,
+      "start": "2025-11-09T18:00Z"
+    },
+    {
+      "week": 10,
+      "homeTeam": "Houston Texans",
+      "homeAbbr": "HOU",
+      "awayTeam": "Jacksonville Jaguars",
+      "awayAbbr": "JAX",
+      "total": 38.5,
+      "spread": -1.5,
+      "venue": "NRG Stadium",
       "isDome": true,
-      "start": "2025-11-02T21:05Z"
+      "start": "2025-11-09T18:00Z"
     },
     {
-      "week": 9,
-      "homeTeam": "Buffalo Bills",
-      "homeAbbr": "BUF",
-      "awayTeam": "Kansas City Chiefs",
-      "awayAbbr": "KC",
-      "total": null,
-      "spread": null,
-      "venue": "Highmark Stadium",
-      "isDome": false,
-      "start": "2025-11-02T21:25Z"
-    },
-    {
-      "week": 9,
-      "homeTeam": "Washington Commanders",
-      "homeAbbr": "WSH",
-      "awayTeam": "Seattle Seahawks",
-      "awayAbbr": "SEA",
-      "total": null,
-      "spread": null,
-      "venue": "Northwest Stadium",
-      "isDome": false,
-      "start": "2025-11-03T01:20Z"
-    },
-    {
-      "week": 9,
-      "homeTeam": "Dallas Cowboys",
-      "homeAbbr": "DAL",
+      "week": 10,
+      "homeTeam": "Seattle Seahawks",
+      "homeAbbr": "SEA",
       "awayTeam": "Arizona Cardinals",
       "awayAbbr": "ARI",
-      "total": null,
-      "spread": null,
-      "venue": "AT&T Stadium",
+      "total": 45.5,
+      "spread": -6.5,
+      "venue": "Lumen Field",
+      "isDome": false,
+      "start": "2025-11-09T21:05Z"
+    },
+    {
+      "week": 10,
+      "homeTeam": "San Francisco 49ers",
+      "homeAbbr": "SF",
+      "awayTeam": "Los Angeles Rams",
+      "awayAbbr": "LAR",
+      "total": 49.5,
+      "spread": 3.5,
+      "venue": "Levi's Stadium",
+      "isDome": false,
+      "start": "2025-11-09T21:25Z"
+    },
+    {
+      "week": 10,
+      "homeTeam": "Washington Commanders",
+      "homeAbbr": "WSH",
+      "awayTeam": "Detroit Lions",
+      "awayAbbr": "DET",
+      "total": 49.5,
+      "spread": 8.5,
+      "venue": "Northwest Stadium",
+      "isDome": false,
+      "start": "2025-11-09T21:25Z"
+    },
+    {
+      "week": 10,
+      "homeTeam": "Los Angeles Chargers",
+      "homeAbbr": "LAC",
+      "awayTeam": "Pittsburgh Steelers",
+      "awayAbbr": "PIT",
+      "total": 44.5,
+      "spread": -2.5,
+      "venue": "SoFi Stadium",
       "isDome": true,
-      "start": "2025-11-04T01:15Z"
+      "start": "2025-11-10T01:20Z"
+    },
+    {
+      "week": 10,
+      "homeTeam": "Green Bay Packers",
+      "homeAbbr": "GB",
+      "awayTeam": "Philadelphia Eagles",
+      "awayAbbr": "PHI",
+      "total": 44.5,
+      "spread": -2.5,
+      "venue": "Lambeau Field",
+      "isDome": false,
+      "start": "2025-11-11T01:15Z"
     }
   ],
   "players": [
@@ -2350,14 +2350,6 @@
       "headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4428396.png"
     },
     {
-      "id": "4240858",
-      "name": "Hendon Hooker",
-      "position": "QB",
-      "team": "CAR",
-      "teamName": "Carolina Panthers",
-      "headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4240858.png"
-    },
-    {
       "id": "4241372",
       "name": "Hollywood Brown",
       "position": "WR",
@@ -3198,14 +3190,6 @@
       "headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/16760.png"
     },
     {
-      "id": "4431142",
-      "name": "Jimmy Holiday",
-      "position": "WR",
-      "team": "KC",
-      "teamName": "Kansas City Chiefs",
-      "headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4431142.png"
-    },
-    {
       "id": "4708486",
       "name": "Jimmy Horn Jr.",
       "position": "WR",
@@ -3284,14 +3268,6 @@
       "team": "NYJ",
       "teamName": "New York Jets",
       "headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4567096.png"
-    },
-    {
-      "id": "4426494",
-      "name": "John Rhys Plumlee",
-      "position": "QB",
-      "team": "PIT",
-      "teamName": "Pittsburgh Steelers",
-      "headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4426494.png"
     },
     {
       "id": "4362489",
@@ -3918,14 +3894,6 @@
       "headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4710855.png"
     },
     {
-      "id": "3910176",
-      "name": "Kristian Wilkerson",
-      "position": "WR",
-      "team": "BUF",
-      "teamName": "Buffalo Bills",
-      "headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/3910176.png"
-    },
-    {
       "id": "4430431",
       "name": "Kurtis Rourke",
       "position": "QB",
@@ -4158,6 +4126,14 @@
       "headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4685278.png"
     },
     {
+      "id": "4431053",
+      "name": "Mac Dalena",
+      "position": "WR",
+      "team": "SEA",
+      "teamName": "Seattle Seahawks",
+      "headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4431053.png"
+    },
+    {
       "id": "4241464",
       "name": "Mac Jones",
       "position": "QB",
@@ -4188,14 +4164,6 @@
       "team": "DET",
       "teamName": "Detroit Lions",
       "headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4240069.png"
-    },
-    {
-      "id": "4240603",
-      "name": "Malik Davis",
-      "position": "RB",
-      "team": "DAL",
-      "teamName": "Dallas Cowboys",
-      "headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4240603.png"
     },
     {
       "id": "4689334",
@@ -4260,6 +4228,14 @@
       "team": "BAL",
       "teamName": "Baltimore Ravens",
       "headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/3116365.png"
+    },
+    {
+      "id": "3051738",
+      "name": "Marquez Valdes-Scantling",
+      "position": "WR",
+      "team": "PIT",
+      "teamName": "Pittsburgh Steelers",
+      "headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/3051738.png"
     },
     {
       "id": "4429023",
@@ -5518,14 +5494,6 @@
       "headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4875912.png"
     },
     {
-      "id": "4362630",
-      "name": "Terrace Marshall Jr.",
-      "position": "WR",
-      "team": "PHI",
-      "teamName": "Philadelphia Eagles",
-      "headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4362630.png"
-    },
-    {
       "id": "4570037",
       "name": "Terrance Ferguson",
       "position": "TE",
@@ -6313,194 +6281,194 @@
   "weather": [
     {
       "team": "49ers",
-      "tempF": 43.34,
-      "windMph": 4.2874599,
+      "tempF": 52.16,
+      "windMph": 10.936129600000001,
       "condition": 0
     },
     {
       "team": "Chiefs",
-      "tempF": 43.34,
-      "windMph": 4.2874599,
+      "tempF": 52.16,
+      "windMph": 10.936129600000001,
       "condition": 0
     },
     {
       "team": "Bills",
-      "tempF": 43.34,
-      "windMph": 4.2874599,
+      "tempF": 52.16,
+      "windMph": 10.936129600000001,
       "condition": 0
     },
     {
       "team": "Cowboys",
-      "tempF": 43.34,
-      "windMph": 4.2874599,
+      "tempF": 52.16,
+      "windMph": 10.936129600000001,
       "condition": 0
     },
     {
       "team": "Eagles",
-      "tempF": 43.34,
-      "windMph": 4.2874599,
+      "tempF": 52.16,
+      "windMph": 10.936129600000001,
       "condition": 0
     },
     {
       "team": "Lions",
-      "tempF": 43.34,
-      "windMph": 4.2874599,
+      "tempF": 52.16,
+      "windMph": 10.936129600000001,
       "condition": 0
     },
     {
       "team": "Ravens",
-      "tempF": 43.34,
-      "windMph": 4.2874599,
+      "tempF": 52.16,
+      "windMph": 10.936129600000001,
       "condition": 0
     },
     {
       "team": "Packers",
-      "tempF": 43.34,
-      "windMph": 4.2874599,
+      "tempF": 52.16,
+      "windMph": 10.936129600000001,
       "condition": 0
     },
     {
       "team": "Bears",
-      "tempF": 43.34,
-      "windMph": 4.2874599,
+      "tempF": 52.16,
+      "windMph": 10.936129600000001,
       "condition": 0
     },
     {
       "team": "Patriots",
-      "tempF": 43.34,
-      "windMph": 4.2874599,
+      "tempF": 52.16,
+      "windMph": 10.936129600000001,
       "condition": 0
     },
     {
       "team": "Broncos",
-      "tempF": 43.34,
-      "windMph": 4.2874599,
+      "tempF": 52.16,
+      "windMph": 10.936129600000001,
       "condition": 0
     },
     {
       "team": "Seahawks",
-      "tempF": 43.34,
-      "windMph": 4.2874599,
+      "tempF": 52.16,
+      "windMph": 10.936129600000001,
       "condition": 0
     },
     {
       "team": "Chargers",
-      "tempF": 43.34,
-      "windMph": 4.2874599,
+      "tempF": 52.16,
+      "windMph": 10.936129600000001,
       "condition": 0
     },
     {
       "team": "Raiders",
-      "tempF": 43.34,
-      "windMph": 4.2874599,
+      "tempF": 52.16,
+      "windMph": 10.936129600000001,
       "condition": 0
     },
     {
       "team": "Giants",
-      "tempF": 43.34,
-      "windMph": 4.2874599,
+      "tempF": 52.16,
+      "windMph": 10.936129600000001,
       "condition": 0
     },
     {
       "team": "Jets",
-      "tempF": 43.34,
-      "windMph": 4.2874599,
+      "tempF": 52.16,
+      "windMph": 10.936129600000001,
       "condition": 0
     },
     {
       "team": "Falcons",
-      "tempF": 43.34,
-      "windMph": 4.2874599,
+      "tempF": 52.16,
+      "windMph": 10.936129600000001,
       "condition": 0
     },
     {
       "team": "Saints",
-      "tempF": 43.34,
-      "windMph": 4.2874599,
+      "tempF": 52.16,
+      "windMph": 10.936129600000001,
       "condition": 0
     },
     {
       "team": "Vikings",
-      "tempF": 43.34,
-      "windMph": 4.2874599,
+      "tempF": 52.16,
+      "windMph": 10.936129600000001,
       "condition": 0
     },
     {
       "team": "Steelers",
-      "tempF": 43.34,
-      "windMph": 4.2874599,
+      "tempF": 52.16,
+      "windMph": 10.936129600000001,
       "condition": 0
     },
     {
       "team": "Browns",
-      "tempF": 43.34,
-      "windMph": 4.2874599,
+      "tempF": 52.16,
+      "windMph": 10.936129600000001,
       "condition": 0
     },
     {
       "team": "Bengals",
-      "tempF": 43.34,
-      "windMph": 4.2874599,
+      "tempF": 52.16,
+      "windMph": 10.936129600000001,
       "condition": 0
     },
     {
       "team": "Texans",
-      "tempF": 43.34,
-      "windMph": 4.2874599,
+      "tempF": 52.16,
+      "windMph": 10.936129600000001,
       "condition": 0
     },
     {
       "team": "Titans",
-      "tempF": 43.34,
-      "windMph": 4.2874599,
+      "tempF": 52.16,
+      "windMph": 10.936129600000001,
       "condition": 0
     },
     {
       "team": "Jaguars",
-      "tempF": 43.34,
-      "windMph": 4.2874599,
+      "tempF": 52.16,
+      "windMph": 10.936129600000001,
       "condition": 0
     },
     {
       "team": "Panthers",
-      "tempF": 43.34,
-      "windMph": 4.2874599,
+      "tempF": 52.16,
+      "windMph": 10.936129600000001,
       "condition": 0
     },
     {
       "team": "Commanders",
-      "tempF": 43.34,
-      "windMph": 4.2874599,
+      "tempF": 52.16,
+      "windMph": 10.936129600000001,
       "condition": 0
     },
     {
       "team": "Cardinals",
-      "tempF": 43.34,
-      "windMph": 4.2874599,
+      "tempF": 52.16,
+      "windMph": 10.936129600000001,
       "condition": 0
     },
     {
       "team": "Rams",
-      "tempF": 43.34,
-      "windMph": 4.2874599,
+      "tempF": 52.16,
+      "windMph": 10.936129600000001,
       "condition": 0
     },
     {
       "team": "Colts",
-      "tempF": 43.34,
-      "windMph": 4.2874599,
+      "tempF": 52.16,
+      "windMph": 10.936129600000001,
       "condition": 0
     },
     {
       "team": "Dolphins",
-      "tempF": 43.34,
-      "windMph": 4.2874599,
+      "tempF": 52.16,
+      "windMph": 10.936129600000001,
       "condition": 0
     },
     {
       "team": "Buccaneers",
-      "tempF": 43.34,
-      "windMph": 4.2874599,
+      "tempF": 52.16,
+      "windMph": 10.936129600000001,
       "condition": 0
     }
   ]
