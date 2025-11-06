@@ -1,75 +1,39 @@
-// src/app/api/cron/sync/route.ts
 import { NextResponse } from "next/server";
 
 export async function GET() {
   try {
-    const boardRes = await fetch(
-      "https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?seasontype=2",
-      { cache: "no-store" }
-    );
-    const board = await boardRes.json();
-    let week = board?.week?.number ?? 0;
+    // Derive full origin (localhost or prod) dynamically
+    const baseUrl =
+      process.env.NEXT_PUBLIC_BASE_URL ||
+      process.env.VERCEL_URL
+        ? `https://${process.env.VERCEL_URL}`
+        : "http://localhost:3000";
 
-    const events = board?.events || [];
-    const allFinal = events.every((e: any) =>
-      e?.competitions?.[0]?.status?.type?.completed
-    );
-    if (allFinal) week += 1;
-
-    // Schedule
-    const schedRes = await fetch(
-      `https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?seasontype=2&week=${week}`,
-      { cache: "no-store" }
-    );
-    const sched = await schedRes.json();
-
-    const schedule = (sched.events || []).map((g: any) => {
-      const c = g.competitions?.[0];
-      const home = c?.competitors?.find((x: any) => x.homeAway === "home");
-      const away = c?.competitors?.find((x: any) => x.homeAway === "away");
-      return {
-        week,
-        homeTeam: home?.team?.displayName,
-        homeAbbr: home?.team?.abbreviation,
-        awayTeam: away?.team?.displayName,
-        awayAbbr: away?.team?.abbreviation,
-        start: c?.date ?? null,
-        venue: c?.venue?.fullName ?? null,
-        isDome: /dome|indoor/i.test(c?.venue?.fullName ?? ""),
-      };
-    });
-
-    // Odds & weather
-    const [odds, weather, playersRes] = await Promise.all([
-      fetch(`/api/cron/odds`, { cache: "no-store" }).then((r) => r.json()).catch(() => ({ data: [] })),
-      fetch(`/api/cron/weather`, { cache: "no-store" }).then((r) => r.json()).catch(() => ({ data: [] })),
-      fetch(`/api/cron/players`, { cache: "no-store" }).then((r) => r.json()).catch(() => ({ data: [] })),
+    // Always fetch absolute URLs when inside an API route
+    const [weekRes, playersRes, weatherRes, oddsRes] = await Promise.all([
+      fetch(`${baseUrl}/api/cron/week`).then((r) => r.json()),
+      fetch(`${baseUrl}/api/cron/players`).then((r) => r.json()),
+      fetch(`${baseUrl}/api/cron/weather`).then((r) => r.json()),
+      fetch(`${baseUrl}/api/cron/odds`).then((r) => r.json()),
     ]);
 
-    // Normalize players
-    const players =
-      playersRes.data?.map((p: any) => ({
-        id: p.id,
-        name: p.name,
-        team: p.team,
-        position: p.position,
-        headshot: p.headshot,
-      })) ?? [];
+    const week = weekRes.week ?? 10;
+    const players = playersRes.data ?? [];
+    const weather = weatherRes.data ?? [];
+    const odds = oddsRes.data ?? [];
 
     return NextResponse.json({
       status: "success",
-      fetchedAt: new Date().toISOString(),
       week,
-      schedule,
-      odds: odds.data ?? [],
-      weather: weather.data ?? [],
-      players,
+      count: players.length,
+      snapshot: { week, players, weather, odds },
+      fetchedAt: new Date().toISOString(),
     });
-  } catch (err: any) {
-    return NextResponse.json({
-      status: "error",
-      message: err.message,
-      data: [],
-    });
+  } catch (err) {
+    console.error("❌ Cron sync failed:", err);
+    return NextResponse.json(
+      { status: "error", message: (err as Error).message },
+      { status: 500 }
+    );
   }
 }

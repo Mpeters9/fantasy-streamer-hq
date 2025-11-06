@@ -1,200 +1,207 @@
 "use client";
 import React, { useState, useEffect } from "react";
-import WeightsPanel from "@/components/weights-panel";
-import PlayerAutocomplete from "@/components/player-autocomplete";
-import { calculateStreamerScore } from "@/lib/scoring-engine";
 
-export default function ManualPage() {
-  const [openWeights, setOpenWeights] = useState(false);
-  const [player, setPlayer] = useState<any>(null);
-  const [week, setWeek] = useState<number>(0);
-  const [players, setPlayers] = useState<any[]>([]);
-  const [odds, setOdds] = useState<any[]>([]);
-  const [weather, setWeather] = useState<any[]>([]);
-  const [schedule, setSchedule] = useState<any[]>([]);
+interface Player {
+  id: string;
+  name: string;
+  position: string;
+  team: string;
+  opponent?: string;
+  spread?: string;
+  weather?: string;
+  impliedPts?: number;
+  headshot?: string;
+  score?: number;
+}
+
+export default function ManualDashboard() {
+  const [week, setWeek] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
+  const [players, setPlayers] = useState<Player[]>([]);
+  const [search, setSearch] = useState("");
+  const [selected, setSelected] = useState<Player | null>(null);
+  const [syncStatus, setSyncStatus] = useState<string>("Not synced");
 
-  // Fetch main data
-  useEffect(() => {
-    const load = async () => {
-      try {
-        const d = await fetch("/api/cron/sync", { cache: "no-store" }).then((r) => r.json());
-        setWeek(d.week || 0);
-        setPlayers(d.players || []);
-        setOdds(d.odds || []);
-        setWeather(d.weather || []);
-        setSchedule(d.schedule || []);
-      } catch (e) {
-        console.error("❌ Load error:", e);
-      }
-    };
-    load();
-  }, []);
-
-  const handleSelect = (p: any) => setPlayer(p);
-
-  const forceRefresh = async () => {
+  const syncData = async () => {
     setLoading(true);
     try {
-      const d = await fetch("/api/cron/sync", { cache: "no-store" }).then((r) => r.json());
-      setWeek(d.week || 0);
-      setPlayers(d.players || []);
-      setOdds(d.odds || []);
-      setWeather(d.weather || []);
-      setSchedule(d.schedule || []);
-await fetch("/api/snapshots", {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({
-    week: d.week,
-    players: d.players,
-    odds: d.odds,
-    weather: d.weather,
-    schedule: d.schedule,
-  }),
-});
-alert(`✅ Synced + snapshot saved for Week ${d.week}`);
+      const res = await fetch("/api/cron/sync");
+      const data = await res.json();
+      setWeek(data.week);
+      setPlayers(data.snapshot?.players || []);
+      setSyncStatus(`✅ Synced for Week ${data.week} (${data.count} players)`);
     } catch (e: any) {
-      alert("❌ Refresh failed: " + e.message);
+      console.error("❌ Sync error:", e);
+      setSyncStatus("❌ Sync failed – try again");
     } finally {
       setLoading(false);
     }
   };
 
-  const getOpponentData = (team: string) => {
-    const game = schedule.find(
-      (g) => g.homeAbbr === team || g.awayAbbr === team
-    );
-    if (!game) return null;
-
-    const isHome = game.homeAbbr === team;
-    const opponent = isHome ? game.awayAbbr : game.homeAbbr;
-
-    const oddsData = odds.find(
-      (o: any) =>
-        o.homeTeam?.includes(game.homeAbbr) ||
-        o.awayTeam?.includes(game.awayAbbr)
-    );
-
-    const spread =
-      isHome && oddsData
-        ? oddsData.spread
-        : oddsData
-        ? oddsData.spread * -1
-        : "N/A";
-
-    const weatherData = weather.find((w) => w.team === team);
-
-    return {
-      opponent,
-      spread,
-      temp: weatherData?.tempF ?? "—",
-      wind: weatherData?.windMph ?? "—",
-      condition: weatherData?.condition ?? "—",
-      impliedPts: oddsData ? (oddsData.total / 2).toFixed(1) : "—",
-    };
+  const loadPlayers = async () => {
+    try {
+      const res = await fetch("/api/cron/players");
+      const data = await res.json();
+      setPlayers(data.data || []);
+    } catch (e) {
+      console.error("Player load failed:", e);
+    }
   };
 
-  const matchup = player ? getOpponentData(player.team) : null;
+  useEffect(() => {
+    loadPlayers();
+  }, []);
+
+  const handleSelect = async (player: Player) => {
+    setSearch(player.name);
+    setSelected(null);
+    try {
+      const [weatherRes, oddsRes] = await Promise.all([
+        fetch("/api/cron/weather").then((r) => r.json()),
+        fetch("/api/cron/odds").then((r) => r.json()),
+      ]);
+
+      const weather = weatherRes.data.find(
+        (w: any) => w.team === player.team
+      );
+      const game = oddsRes.data.find(
+        (g: any) => g.homeTeam === player.team || g.awayTeam === player.team
+      );
+
+      const opponent =
+        game?.homeTeam === player.team ? game?.awayTeam : game?.homeTeam;
+      const spread =
+        game?.homeTeam === player.team
+          ? game.spread
+          : game.spread
+          ? -1 * game.spread
+          : "N/A";
+      const impliedPts = game?.total
+        ? (game.total / 2 + (spread as number) / 2).toFixed(1)
+        : "N/A";
+
+      const playerData = {
+        ...player,
+        opponent,
+        spread: typeof spread === "number" ? spread.toFixed(1) : spread,
+        impliedPts,
+        weather: weather
+          ? `${weather.tempF.toFixed(0)}°F, Wind ${weather.windMph.toFixed(
+              0
+            )} mph`
+          : "Indoor/Dome",
+        headshot: `https://a.espncdn.com/i/headshots/nfl/players/full/${player.id}.png`,
+      };
+
+      setSelected(playerData);
+    } catch (e) {
+      console.error("Failed to load player details:", e);
+    }
+  };
+
+  const filteredPlayers =
+    search.length > 1
+      ? players.filter((p) =>
+          p.name.toLowerCase().includes(search.toLowerCase())
+        )
+      : [];
 
   return (
-    <div className="p-6 min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-semibold">Fantasy Streamer HQ – Manual Dashboard</h1>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={forceRefresh}
-            disabled={loading}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded-md"
-          >
-            {loading ? "Refreshing..." : "♻️ Force Data Refresh"}
-          </button>
-          <button
-            onClick={() => setOpenWeights(true)}
-            className="bg-gray-700 hover:bg-gray-800 text-white px-3 py-1 rounded-md"
-          >
-            ⚙️ Weights
-          </button>
+    <div className="min-h-screen bg-gray-900 text-gray-100 flex flex-col gap-6">
+      <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-white">🧾 Manual Dashboard</h1>
+          <p className="text-gray-400 mt-1">
+            Current Week:{" "}
+            <span className="font-semibold text-blue-400">
+              {week ? week : "–"}
+            </span>
+          </p>
         </div>
+
+        <button
+          onClick={syncData}
+          disabled={loading}
+          className={`mt-4 sm:mt-0 px-4 py-2 rounded text-white shadow transition-colors ${
+            loading
+              ? "bg-gray-600 cursor-wait"
+              : "bg-blue-600 hover:bg-blue-700 cursor-pointer"
+          }`}
+        >
+          {loading ? "🔄 Syncing..." : "🔁 Force Data Refresh"}
+        </button>
+      </header>
+
+      <div
+        className={`rounded-lg p-4 border ${
+          syncStatus.startsWith("✅")
+            ? "border-green-400 bg-green-900/20"
+            : syncStatus.startsWith("❌")
+            ? "border-red-400 bg-red-900/20"
+            : "border-gray-700 bg-gray-800"
+        } text-gray-200`}
+      >
+        {syncStatus}
       </div>
 
-      <div className="mb-4 text-sm">
-        <span className="font-semibold">Current Week:</span> {week || "—"}
-      </div>
+      <section className="bg-gray-800 rounded-xl border border-gray-700 p-6 shadow-lg">
+        <h2 className="text-xl font-semibold mb-4">Search Players</h2>
 
-      {/* Player search */}
-      <div className="mb-6">
-        <PlayerAutocomplete onSelect={handleSelect} />
-      </div>
+        <div className="relative mb-6">
+          <input
+            type="text"
+            placeholder="🔍 Type a player name..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="bg-gray-900 border border-gray-700 text-gray-100 px-3 py-2 rounded-md w-full focus:ring-2 focus:ring-blue-500 outline-none"
+          />
+          {filteredPlayers.length > 0 && (
+            <div className="absolute z-10 bg-gray-800 border border-gray-700 mt-1 w-full max-h-64 overflow-y-auto rounded-md shadow-lg">
+              {filteredPlayers.slice(0, 10).map((p) => (
+                <div
+                  key={p.id}
+                  className="p-2 hover:bg-gray-700 cursor-pointer"
+                  onClick={() => handleSelect(p)}
+                >
+                  {p.name} • {p.team} ({p.position})
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
 
-      {/* Selected player card */}
-      {player && (
-        <div className="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-md border border-gray-200 dark:border-gray-700 max-w-3xl">
-          <div className="flex items-center gap-4 border-b border-gray-300 dark:border-gray-700 pb-3 mb-3">
-            {player.headshot && (
-              <img
-                src={player.headshot}
-                alt={player.name}
-                className="w-16 h-16 rounded-full object-cover"
-              />
-            )}
-            <div>
-              <h2 className="text-xl font-semibold">{player.name}</h2>
-              <p className="text-sm text-gray-400">
-                {player.team} • {player.position}
+        {selected ? (
+          <div className="rounded-lg bg-gray-900 border border-gray-700 p-4 flex items-center gap-4 shadow-inner">
+            <img
+              src={selected.headshot}
+              onError={(e) =>
+                ((e.target as HTMLImageElement).src =
+                  "https://a.espncdn.com/i/headshots/nophoto.png")
+              }
+              alt={selected.name}
+              className="w-16 h-16 rounded-full border border-gray-600 object-cover"
+            />
+            <div className="flex-1">
+              <h3 className="text-lg font-semibold text-white">
+                {selected.name}
+              </h3>
+              <p className="text-gray-400">
+                {selected.team} • {selected.position}
               </p>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-2 text-sm">
+                <p>Opponent: {selected.opponent || "TBD"}</p>
+                <p>Spread: {selected.spread || "N/A"}</p>
+                <p>Weather: {selected.weather}</p>
+                <p>Implied Pts: {selected.impliedPts}</p>
+              </div>
             </div>
           </div>
-
-          {/* Matchup Info */}
-          <div className="grid grid-cols-5 gap-3 text-sm text-gray-300">
-            <div>
-              <span className="font-semibold text-gray-400">Opponent:</span>{" "}
-              {matchup?.opponent ?? "TBD"}
-            </div>
-            <div>
-              <span className="font-semibold text-gray-400">Spread:</span>{" "}
-              {matchup?.spread ?? "N/A"}
-            </div>
-            <div>
-              <span className="font-semibold text-gray-400">Weather:</span>{" "}
-              {matchup
-                ? `${matchup.temp}°F, Wind ${matchup.wind} mph`
-                : "N/A"}
-            </div>
-            <div>
-              <span className="font-semibold text-gray-400">Implied Pts:</span>{" "}
-              {matchup?.impliedPts ?? "—"}
-            </div>
-            <div>
-              <span className="font-semibold text-gray-400">Score:</span>{" "}
-              {calculateStreamerScore({
-                targetShare: 0.5,
-                snapShare: 0.6,
-                redZone: 0.3,
-                weather: 0.8,
-                spread: 0.4,
-                total: 0.6,
-                recentForm: 0.7,
-              })}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal for weights panel */}
-      {openWeights && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-900 rounded-xl w-[400px]">
-            <div className="flex justify-between items-center p-3 border-b border-gray-700">
-              <h3 className="font-semibold">Adjust Scoring Weights</h3>
-              <button onClick={() => setOpenWeights(false)}>✖</button>
-            </div>
-            <WeightsPanel />
-          </div>
-        </div>
-      )}
+        ) : (
+          <p className="text-gray-400 text-sm">
+            Select a player to view matchup data.
+          </p>
+        )}
+      </section>
     </div>
   );
 }
