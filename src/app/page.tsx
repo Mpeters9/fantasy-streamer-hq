@@ -5,7 +5,9 @@ export default function HomePage() {
       <p className="text-gray-400 mb-4">
         Launch the dashboard from the sidebar to get started.
       </p>
-      <p className="text-gray-500">Use the 🧠 Manual Entry tab to input players.</p>
+      <p className="text-gray-500">
+        Use the 🧠 Manual Entry tab to input players.
+      </p>
     </div>
   );
 }

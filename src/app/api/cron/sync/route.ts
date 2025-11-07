@@ -2,103 +2,105 @@ import { NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
 
-const CACHE_PATH = path.join(process.cwd(), "tmp", "fshq-cache.json");
+const TMP_DIR = path.join(process.cwd(), "tmp");
+const CACHE_PATH = path.join(TMP_DIR, "player-cache.json");
 
-async function getCurrentWeek() {
-  try {
-    const res = await fetch("https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard");
-    const data = await res.json();
-    return data.week?.number || 1;
-  } catch {
-    return 10;
-  }
-}
+// Normalize team keys to a simple token for matching
+const norm = (s: string) => (s || "").toLowerCase().replace(/[^a-z]/g, "");
 
-function shouldAutoRefresh(filePath: string) {
-  if (!fs.existsSync(filePath)) return true;
-  const stats = fs.statSync(filePath);
-  const lastModified = new Date(stats.mtime);
-  const now = new Date();
-  const tuesday = new Date(now);
-  tuesday.setDate(now.getDate() - ((now.getDay() + 5) % 7));
-  tuesday.setHours(2, 0, 0, 0);
-  return lastModified < tuesday;
+// Basic implied points calculator
+function calcImplied(total: number, spread: number, isHome: boolean) {
+  const fav = total / 2 - spread / 2;
+  const dog = total - fav;
+  return isHome ? fav : dog;
 }
 
 export async function GET(req: Request) {
-  const url = new URL(req.url);
-  const force = url.searchParams.get("force") === "true";
-
   try {
-    const CURRENT_WEEK = await getCurrentWeek();
-    const mustRefresh = force || shouldAutoRefresh(CACHE_PATH);
+    const url = new URL(req.url);
+    const force = url.searchParams.get("force") === "true";
 
-    if (!mustRefresh && fs.existsSync(CACHE_PATH)) {
-      const cached = JSON.parse(fs.readFileSync(CACHE_PATH, "utf8"));
-      if (cached.snapshot?.players?.length > 0) {
-        return NextResponse.json({
-          status: "cached",
-          week: cached.week,
-          snapshot: cached.snapshot,
-          count: cached.snapshot.players.length,
-        });
-      }
+    const origin = `${url.protocol}//${url.host}`; // absolute base for internal fetches
+
+    if (!fs.existsSync(TMP_DIR)) fs.mkdirSync(TMP_DIR);
+
+    // 1) Pull fresh players
+    const playersRes = await fetch(`${origin}/api/cron/players`, { cache: "no-store" });
+    const playersJson = await playersRes.json();
+    if (!playersJson?.ok) throw new Error(playersJson?.error || "Failed players");
+
+    // 2) Odds & schedule (your existing endpoints)
+    const weekRes = await fetch(`${origin}/api/cron/week`, { cache: "no-store" });
+    const { week } = await weekRes.json();
+
+    const schedRes = await fetch(`${origin}/api/cron/schedule?week=${week}`, { cache: "no-store" });
+    const schedJson = await schedRes.json();
+    const games: any[] = schedJson?.data ?? [];
+
+    // Build a lookup for opponent/spread/implied by team
+    // Expecting schedule items: { homeTeam, awayTeam, spread, total, ... }
+    const byTeam: Record<string, any> = {};
+    for (const g of games) {
+      const home = g.homeTeam;
+      const away = g.awayTeam;
+      const spread = typeof g.spread === "number" ? g.spread : 0;
+      const total = typeof g.total === "number" ? g.total : 44;
+
+      byTeam[norm(home)] = {
+        opponent: away,
+        spread, // spread is for home team (negative = home favorite)
+        implied: calcImplied(total, spread, true),
+      };
+      byTeam[norm(away)] = {
+        opponent: home,
+        // flip spread for away side
+        spread: -spread,
+        implied: calcImplied(total, spread, false),
+      };
     }
 
-    console.log(`🔁 Rebuilding player snapshot for Week ${CURRENT_WEEK}`);
+    // 3) Weather (expecting [{team, tempF, windMph, condition}])
+    const weatherRes = await fetch(`${origin}/api/cron/weather`, { cache: "no-store" });
+    const weatherJson = await weatherRes.json();
+    const wMap: Record<string, any> = {};
+    for (const w of weatherJson?.data ?? []) {
+      wMap[norm(w.team)] = w;
+    }
 
-    const [playersRes, oddsRes, weatherRes, scheduleRes] = await Promise.all([
-      fetch("http://localhost:3000/api/cron/players").then((r) => r.json()),
-      fetch("http://localhost:3000/api/cron/odds").then((r) => r.json()),
-      fetch("http://localhost:3000/api/cron/weather").then((r) => r.json()),
-      fetch(`http://localhost:3000/api/cron/schedule?week=${CURRENT_WEEK}`).then((r) => r.json()),
-    ]);
+    // 4) Merge
+    const merged = (playersJson.data as any[]).map(p => {
+      const teamKey = norm(p.team);           // "dal"
+      const odds = byTeam[teamKey];
+      const weather = wMap[teamKey];
 
-    const players = playersRes?.players || playersRes?.data || [];
-    const odds = oddsRes?.data || [];
-    const weather = weatherRes?.data || [];
-    const schedule = scheduleRes?.data || [];
+      return {
+        ...p,
+        opponent: odds?.opponent ?? "TBD",
+        spread: typeof odds?.spread === "number" ? Number(odds.spread) : 0,
+        impliedPts: typeof odds?.implied === "number" ? Number(odds.implied.toFixed(1)) : null,
+        weather: weather
+          ? (weather.condition === 0 ? "Clear"
+            : weather.condition === 3 ? "Wind"
+            : "Weather")
+          : "Indoor/Dome",
+      };
+    });
 
-    const merged = players
-      .filter((p: any) => ["QB", "RB", "WR", "TE", "DST", "K"].includes(p.position))
-      .map((p: any) => {
-        const sched = schedule.find((g: any) => g.homeTeam === p.team || g.awayTeam === p.team);
-        const opponent = sched?.homeTeam === p.team ? sched?.awayTeam : sched?.homeTeam ?? "TBD";
-        const oddsGame = odds.find((g: any) => g.homeTeam === p.team || g.awayTeam === p.team) || sched;
+    // 5) Write cache (always, or only if force — either way is safe)
+    fs.writeFileSync(CACHE_PATH, JSON.stringify({
+      week,
+      updatedAt: new Date().toISOString(),
+      players: merged,
+    }, null, 2));
 
-        const rawSpread = oddsGame?.spread ?? 0;
-        const spread = oddsGame?.homeTeam === p.team ? Number(rawSpread) : -1 * Number(rawSpread);
-        const impliedPts =
-          typeof oddsGame?.total === "number" ? (oddsGame.total / 2 + spread / 2).toFixed(1) : "N/A";
-
-        const weatherInfo = weather.find(
-          (w: any) => w.team === p.team || w.teamAbbrev === p.team || w.location?.includes(p.team)
-        );
-        const weatherText = weatherInfo
-          ? `${weatherInfo.tempF?.toFixed?.(0) ?? "?"}°F • Wind ${weatherInfo.windMph?.toFixed?.(0) ?? "?"} mph`
-          : "N/A";
-
-        return {
-          id: p.id,
-          name: p.name,
-          team: p.team,
-          position: p.position,
-          opponent,
-          spread: isNaN(spread) ? "N/A" : spread.toFixed(1),
-          impliedPts,
-          weather: weatherText,
-          headshot:
-            p.headshot || `https://a.espncdn.com/i/headshots/nfl/players/full/${p.id}.png`,
-        };
-      });
-
-    const snapshot = { week: CURRENT_WEEK, players: merged, fetchedAt: new Date().toISOString() };
-    fs.mkdirSync(path.dirname(CACHE_PATH), { recursive: true });
-    fs.writeFileSync(CACHE_PATH, JSON.stringify({ week: CURRENT_WEEK, snapshot }, null, 2));
-
-    return NextResponse.json({ status: "refreshed", week: CURRENT_WEEK, snapshot, count: merged.length });
+    return NextResponse.json({
+      ok: true,
+      week,
+      count: merged.length,
+      cache: CACHE_PATH,
+    });
   } catch (err: any) {
-    console.error("❌ sync failed:", err);
-    return NextResponse.json({ status: "error", message: err.message, snapshot: { players: [] } }, { status: 500 });
+    console.error("❌ /cron/sync:", err);
+    return NextResponse.json({ ok: false, error: err.message }, { status: 500 });
   }
 }

@@ -1,0 +1,41 @@
+{
+  "week": 10,
+  "players": [
+    {
+      "id": "walker-ken",
+      "name": "Kenneth Walker III",
+      "position": "RB",
+      "team": "SEA",
+      "opponent": "GB",
+      "spread": -3.5,
+      "impliedPts": 24.2,
+      "weather": "Rainy",
+      "streamerScore": 84.5,
+      "headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4361033.png"
+    },
+    {
+      "id": "judkins-quinshon",
+      "name": "Quinshon Judkins",
+      "position": "RB",
+      "team": "CLE",
+      "opponent": "PIT",
+      "spread": -2,
+      "impliedPts": 22.1,
+      "weather": "Cloudy",
+      "streamerScore": 78.4,
+      "headshot": "https://a.espncdn.com/i/headshots/nophoto.png"
+    },
+    {
+      "id": "sutton-courtland",
+      "name": "Courtland Sutton",
+      "position": "WR",
+      "team": "DEN",
+      "opponent": "LV",
+      "spread": 1.5,
+      "impliedPts": 21.8,
+      "weather": "Clear",
+      "streamerScore": 76.3,
+      "headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/3912545.png"
+    }
+  ]
+}

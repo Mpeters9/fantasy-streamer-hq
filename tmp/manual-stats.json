@@ -1,16 +1,34 @@
-[
-  {
-    "playerName": "Kenneth Walker III",
-    "position": "RB",
-    "team": "SEA",
-    "fantasyPointsLast3": "34511",
-    "rushShare": "4214124",
-    "targetShare": "1251235",
-    "snapShare": "35235",
-    "twoMinRole": "325",
-    "oppExplosiveRush": "23532",
-    "goalLineCarries": "5325",
-    "redZoneTouches": "235532",
-    "thirdDownRole": "2355325"
-  }
-]
+{
+  "data": [
+    {
+      "key": "2577417|DAL",
+      "id": "2577417",
+      "name": "Dak Prescott",
+      "team": "DAL",
+      "pos": "QB",
+      "stats": {}
+    },
+    {
+      "key": "4685702|CLE",
+      "id": "4685702",
+      "name": "Quinshon Judkins",
+      "team": "CLE",
+      "pos": "RB",
+      "stats": {
+        "OppRank_vs_RB": 2,
+        "ExplosiveRush%_Opp": 4
+      }
+    },
+    {
+      "key": "3054850|NO",
+      "id": "3054850",
+      "name": "Alvin Kamara",
+      "team": "NO",
+      "pos": "RB",
+      "stats": {
+        "OppRank_vs_RB": 5235,
+        "Opp_RunSuccess_A": 3626
+      }
+    }
+  ]
+}

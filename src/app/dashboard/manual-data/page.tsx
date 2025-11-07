@@ -1,249 +1,292 @@
 "use client";
+import React, { useEffect, useMemo, useState } from "react";
 
-import React, { useEffect, useState } from "react";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-
-interface Player {
-  id: string;
+type Player = {
+  id?: string;
   name: string;
-  position: string;
   team: string;
+  pos?: string;
+  position?: string;
+};
+
+// ---------- MANUAL INPUT FIELDS (from your Google Sheet, auto fields removed) ----------
+const QB_FIELDS = [
+  "OppRank_vs_QB",
+  "Opp_PressureRate_A",
+  "Opp_ExplosivePass_A",
+  "Recent3_FantasyAvg",
+  "RushYds_perG",
+  "PassAtt_perG",
+  "DeepAtt_perG",
+  "Top_PassCatchers_Active",
+  "Available?",
+  "Score",
+  "Rank",
+];
+
+const RB_FIELDS = [
+  "OppRank_vs_RB",
+  "Opp_RunSuccess_A",
+  "SnapShare%",
+  "RushShare%",
+  "Targets_perG",
+  "RedZoneTouches",
+  "GoalLineCarries",
+  "ExplosiveRush%_Opp",
+  "TwoMinRole",
+  "ThirdDownRole",
+  "YardsPerRouteRun",
+  "RecentForm_RB",
+  "Available?",
+  "Score",
+  "Rank",
+];
+
+const WR_FIELDS = [
+  "OppRank_vs_WR",
+  "Opp_ExplosivePass_A",
+  "TargetShare%",
+  "AirYards",
+  "aDOT",
+  "RedZoneTargets",
+  "FirstReadShare",
+  "YardsPerRouteRun",
+  "RecentForm_WR",
+  "Available?",
+  "Score",
+  "Rank",
+];
+
+const TE_FIELDS = [
+  "OppRank_vs_TE",
+  "Route%",
+  "TargetShare%",
+  "RedZoneTargets",
+  "QB_Status",
+  "YardsPerRouteRun",
+  "Recent3_FantasyAvg",
+  "Available?",
+  "Score",
+  "Rank",
+];
+
+// helper: field mapping
+function getFieldsFor(pos?: string) {
+  const p = (pos || "").toUpperCase();
+  if (p === "QB") return QB_FIELDS;
+  if (p === "RB") return RB_FIELDS;
+  if (p === "WR") return WR_FIELDS;
+  if (p === "TE") return TE_FIELDS;
+  return [];
 }
 
-interface ManualStat {
-  playerName: string;
-  position: string;
-  team: string;
-  [key: string]: string | number | undefined;
+function isBoolean(label: string) {
+  return /Available\?|QB_Status/i.test(label);
+}
+function isPercent(label: string) {
+  return /%/.test(label);
+}
+function isText(label: string) {
+  return /Top_PassCatchers_Active|QB_Status/.test(label);
 }
 
-export default function ManualDataPage() {
-  const [stats, setStats] = useState<ManualStat[]>([]);
+export default function ManualDataEntry() {
   const [players, setPlayers] = useState<Player[]>([]);
   const [search, setSearch] = useState("");
-  const [filtered, setFiltered] = useState<Player[]>([]);
-  const [newEntry, setNewEntry] = useState<ManualStat>({
-    playerName: "",
-    position: "",
-    team: "",
-  });
+  const [selected, setSelected] = useState<Player | null>(null);
+  const [form, setForm] = useState<Record<string, any>>({});
+  const [status, setStatus] = useState("");
+  const [saving, setSaving] = useState(false);
 
-  // Load ESPN player list
+  // load players for search
   useEffect(() => {
-    fetch("/api/cron/players")
-      .then((r) => r.json())
-      .then((d) => setPlayers(d.data || []));
+    (async () => {
+      try {
+        const res = await fetch("/api/scoring", { cache: "no-store" });
+        const data = await res.json();
+        if (Array.isArray(data?.data)) setPlayers(data.data);
+      } catch (e) {
+        console.error("Failed to load players", e);
+      }
+    })();
   }, []);
 
-  // Search filter
-  useEffect(() => {
-    if (!search) return setFiltered([]);
-    const s = search.toLowerCase();
-    setFiltered(
-      players
-        .filter(
-          (p) =>
-            p.name.toLowerCase().includes(s) ||
-            p.team.toLowerCase().includes(s) ||
-            p.position.toLowerCase().includes(s)
-        )
-        .slice(0, 6)
-    );
-  }, [search, players]);
+  const results = useMemo(() => {
+    const q = search.toLowerCase().trim();
+    if (!q) return [];
+    return players.filter((p) => p.name.toLowerCase().includes(q)).slice(0, 15);
+  }, [players, search]);
 
   const selectPlayer = (p: Player) => {
-    setNewEntry({ playerName: p.name, position: p.position, team: p.team });
+    setSelected({ ...p, pos: p.pos || p.position });
     setSearch("");
-    setFiltered([]);
+    setForm({});
+    setStatus("");
   };
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setNewEntry({ ...newEntry, [e.target.name]: e.target.value });
+  const handleChange = (label: string, val: string) => {
+    let v: any = val;
+    if (isBoolean(label)) v = val === "true";
+    else if (!isText(label)) {
+      const n = Number(val);
+      v = Number.isFinite(n) ? n : val;
+    }
+    setForm((f) => ({ ...f, [label]: v }));
   };
 
-  const addEntry = () => {
-    if (!newEntry.playerName) return alert("Select a player first!");
-    setStats([...stats, newEntry]);
-    setNewEntry({ playerName: "", position: "", team: "" });
+  const save = async () => {
+    if (!selected) return;
+    setSaving(true);
+    try {
+      const body = {
+        id: selected.id,
+        name: selected.name,
+        team: selected.team,
+        pos: selected.pos,
+        stats: form,
+      };
+      await fetch("/api/manual-stats", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      setStatus("✅ Saved successfully");
+    } catch (e) {
+      console.error(e);
+      setStatus("❌ Save failed");
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const saveAll = async () => {
-    await fetch("/api/manual-stats", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(stats),
-    });
-    alert("✅ Saved!");
-  };
-
-  const renderInputs = () => {
-    const pos = newEntry.position;
-    const inputClass = "bg-gray-800 text-gray-100";
-    const make = (name: string, placeholder: string) => (
-      <Input
-        key={name}
-        name={name}
-        placeholder={placeholder}
-        type="text"
-        onChange={handleChange}
-        className={inputClass}
-      />
-    );
-
-    if (pos === "QB")
-      return (
-        <>
-          {make("fantasyPointsLast3", "FP Last 3")}
-          {make("passAttempts", "Pass Att/G")}
-          {make("deepAttempts", "Deep Att/G")}
-          {make("rushYardsPerGame", "Rush Yds/G")}
-          {make("oppRankQB", "Opp Rank vs QB")}
-          {make("oppExplosivePass", "Explosive Pass % (Opp)")}
-        </>
-      );
-
-    if (pos === "RB")
-      return (
-        <>
-          {make("fantasyPointsLast3", "FP Last 3")}
-          {make("rushShare", "Rush Share %")}
-          {make("targetShare", "Target %")}
-          {make("snapShare", "Snap %")}
-          {make("redZoneTouches", "Red Zone Touches")}
-          {make("goalLineCarries", "Goal Line Carries")}
-          {make("oppExplosiveRush", "Explosive Rush % (Opp)")}
-          {make("twoMinRole", "Two-Min Role (Y/N)")}
-          {make("thirdDownRole", "3rd Down Role (Y/N)")}
-        </>
-      );
-
-    if (pos === "WR")
-      return (
-        <>
-          {make("fantasyPointsLast3", "FP Last 3")}
-          {make("targetShare", "Target %")}
-          {make("airYards", "Air Yards")}
-          {make("aDOT", "aDOT")}
-          {make("redZoneTargets", "Red Zone Targets")}
-          {make("firstReadShare", "1st Read Share %")}
-          {make("yardsPerRouteRun", "Yds/Route Run")}
-          {make("snapShare", "Snap %")}
-        </>
-      );
-
-    if (pos === "TE")
-      return (
-        <>
-          {make("fantasyPointsLast3", "FP Last 3")}
-          {make("routeShare", "Route %")}
-          {make("targetShare", "Target %")}
-          {make("redZoneTargets", "Red Zone Targets")}
-          {make("yardsPerRouteRun", "Yds/Route Run")}
-        </>
-      );
-
-    // Default empty or placeholder
-    return <p className="text-gray-400 italic">Select a player to enter stats.</p>;
-  };
+  const fields = getFieldsFor(selected?.pos || selected?.position);
 
   return (
-    <div className="max-w-6xl mx-auto">
-      <Card className="bg-gray-900 text-gray-100 border border-gray-800 shadow-xl">
-        <CardHeader>
-          <CardTitle className="text-2xl text-blue-400">
-            Manual Data Entry
-          </CardTitle>
-        </CardHeader>
+    <div className="min-h-screen bg-gray-950 text-gray-100 p-6 space-y-6">
+      <header className="flex flex-col sm:flex-row sm:justify-between gap-2">
+        <div>
+          <h1 className="text-3xl font-bold">🧠 Manual Stat Entry</h1>
+          <p className="text-gray-400 text-sm">
+            Enter weekly or ROS stats (Google Sheet manual fields only)
+          </p>
+        </div>
+        <p className="text-sm text-gray-400">{status}</p>
+      </header>
 
-        <CardContent className="space-y-4">
-          {/* Player Search */}
-          <div className="relative">
-            <Input
-              placeholder="Search player..."
-              value={search || newEntry.playerName}
-              onChange={(e) => setSearch(e.target.value)}
-              className="bg-gray-800 text-gray-100"
-            />
-            {filtered.length > 0 && (
-              <div className="absolute bg-gray-800 border border-gray-700 rounded mt-1 w-full max-h-48 overflow-y-auto z-10">
-                {filtered.map((p) => (
-                  <div
-                    key={p.id}
-                    onClick={() => selectPlayer(p)}
-                    className="p-2 cursor-pointer hover:bg-gray-700"
-                  >
-                    {p.name}{" "}
-                    <span className="text-gray-400">
-                      ({p.team} – {p.position})
-                    </span>
+      {/* search */}
+      <div className="relative">
+        <input
+          type="text"
+          placeholder="Search player..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 focus:ring-2 focus:ring-blue-500"
+        />
+        {search && results.length > 0 && (
+          <ul className="absolute z-10 bg-gray-800 border border-gray-700 rounded mt-1 w-full max-h-64 overflow-y-auto">
+            {results.map((r) => (
+              <li
+                key={r.id}
+                onClick={() => selectPlayer(r)}
+                className="p-2 hover:bg-blue-700 cursor-pointer"
+              >
+                {r.name} • {r.team} • {r.pos || r.position}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      {/* entry form */}
+      {selected && (
+        <div className="bg-gray-900 border border-gray-800 rounded-lg p-4 space-y-3">
+          <div className="flex justify-between items-center">
+            <div>
+              <h2 className="text-xl font-semibold">{selected.name}</h2>
+              <p className="text-gray-400 text-sm">
+                {selected.team} • {(selected.pos || selected.position)?.toUpperCase()}
+              </p>
+            </div>
+            <button
+              onClick={() => {
+                setSelected(null);
+                setForm({});
+              }}
+              className="text-red-400 hover:text-red-500 text-sm"
+            >
+              ✖ Clear
+            </button>
+          </div>
+
+          {fields.length > 0 ? (
+            <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-3">
+              {fields.map((label) => {
+                if (isBoolean(label))
+                  return (
+                    <div key={label} className="flex flex-col">
+                      <label className="text-xs text-gray-400 mb-1">{label}</label>
+                      <select
+                        value={
+                          form[label] === true
+                            ? "true"
+                            : form[label] === false
+                            ? "false"
+                            : ""
+                        }
+                        onChange={(e) => handleChange(label, e.target.value)}
+                        className="bg-gray-800 border border-gray-700 rounded px-2 py-1 text-gray-100"
+                      >
+                        <option value="">—</option>
+                        <option value="true">True</option>
+                        <option value="false">False</option>
+                      </select>
+                    </div>
+                  );
+
+                if (isText(label))
+                  return (
+                    <div key={label} className="flex flex-col">
+                      <label className="text-xs text-gray-400 mb-1">{label}</label>
+                      <input
+                        type="text"
+                        value={form[label] ?? ""}
+                        onChange={(e) => handleChange(label, e.target.value)}
+                        className="bg-gray-800 border border-gray-700 rounded px-2 py-1 text-gray-100"
+                      />
+                    </div>
+                  );
+
+                return (
+                  <div key={label} className="flex flex-col">
+                    <label className="text-xs text-gray-400 mb-1">{label}</label>
+                    <input
+                      type="number"
+                      step="any"
+                      value={form[label] ?? ""}
+                      onChange={(e) => handleChange(label, e.target.value)}
+                      className="bg-gray-800 border border-gray-700 rounded px-2 py-1 text-gray-100"
+                    />
                   </div>
-                ))}
-              </div>
-            )}
-          </div>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="text-gray-400 text-sm">
+              No manual fields for this position.
+            </p>
+          )}
 
-          {/* Inputs */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-            {renderInputs()}
-          </div>
-
-          <Button
-            onClick={addEntry}
-            className="bg-green-600 hover:bg-green-500 text-white w-full md:w-auto"
+          <button
+            onClick={save}
+            disabled={saving}
+            className={`mt-3 px-4 py-2 rounded text-white ${
+              saving ? "bg-gray-600" : "bg-blue-600 hover:bg-blue-700"
+            }`}
           >
-            ➕ Add Player
-          </Button>
-
-          {/* Table */}
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm mt-4 border border-gray-800">
-              <thead className="bg-gray-800 text-gray-300">
-                <tr>
-                  <th className="p-2 text-left">Player</th>
-                  <th>Pos</th>
-                  <th>Team</th>
-                  <th>FP Last 3</th>
-                  <th>Key Metrics</th>
-                </tr>
-              </thead>
-              <tbody>
-                {stats.map((s, i) => (
-                  <tr
-                    key={i}
-                    className="border-t border-gray-800 hover:bg-gray-800/40 transition"
-                  >
-                    <td className="p-2">{s.playerName}</td>
-                    <td>{s.position}</td>
-                    <td>{s.team}</td>
-                    <td>{s.fantasyPointsLast3 ?? "-"}</td>
-                    <td>
-                      {Object.entries(s)
-                        .filter(
-                          ([k]) =>
-                            !["playerName", "position", "team", "fantasyPointsLast3"].includes(k)
-                        )
-                        .map(([k, v]) => (
-                          <div key={k} className="text-xs text-gray-300">
-                            {k}: <span className="text-gray-100">{v ?? "-"}</span>
-                          </div>
-                        ))}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          <Button
-            onClick={saveAll}
-            className="bg-blue-600 hover:bg-blue-500 text-white w-full mt-4"
-          >
-            💾 Save Manual Stats
-          </Button>
-        </CardContent>
-      </Card>
+            {saving ? "Saving..." : "💾 Save Stats"}
+          </button>
+        </div>
+      )}
     </div>
   );
 }

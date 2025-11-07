@@ -1,57 +1,43 @@
-import { NextResponse } from "next/server";
-import fs from "fs";
+import { NextRequest, NextResponse } from "next/server";
+import { promises as fs } from "fs";
 import path from "path";
 
-const DATA_DIR = path.join(process.cwd(), "tmp");
-const FILE_PATH = path.join(DATA_DIR, "manual-stats.json");
+const STORE = path.join(process.cwd(), "tmp", "manual-stats.json");
 
-/**
- * Helper to ensure tmp directory exists
- */
-function ensureDir() {
-  if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
-}
-
-/**
- * GET — Load manual stat entries
- */
-export async function GET() {
+async function ensureFile() {
+  await fs.mkdir(path.dirname(STORE), { recursive: true });
   try {
-    ensureDir();
-    if (!fs.existsSync(FILE_PATH)) {
-      fs.writeFileSync(FILE_PATH, JSON.stringify([]));
-    }
-    const file = fs.readFileSync(FILE_PATH, "utf8");
-    const data = JSON.parse(file || "[]");
-    return NextResponse.json({ status: "success", count: data.length, data });
-  } catch (err: any) {
-    console.error("❌ [manual-stats] Error:", err.message);
-    return NextResponse.json({
-      status: "error",
-      message: err.message,
-      data: [],
-    });
+    await fs.access(STORE);
+  } catch {
+    await fs.writeFile(STORE, JSON.stringify({ data: [] }, null, 2), "utf-8");
   }
 }
 
-/**
- * POST — Save entries
- */
-export async function POST(req: Request) {
+export async function GET() {
   try {
+    await ensureFile();
+    const raw = await fs.readFile(STORE, "utf-8");
+    return NextResponse.json(JSON.parse(raw));
+  } catch (e: any) {
+    return NextResponse.json({ status: "error", message: e.message, data: [] });
+  }
+}
+
+export async function POST(req: NextRequest) {
+  try {
+    await ensureFile();
     const body = await req.json();
-    ensureDir();
-    fs.writeFileSync(FILE_PATH, JSON.stringify(body, null, 2));
-    return NextResponse.json({
-      status: "success",
-      count: Array.isArray(body) ? body.length : 0,
-      message: "Manual stats updated successfully.",
-    });
-  } catch (err: any) {
-    console.error("❌ [manual-stats] Save error:", err.message);
-    return NextResponse.json({
-      status: "error",
-      message: err.message,
-    });
+    const raw = await fs.readFile(STORE, "utf-8");
+    const data = JSON.parse(raw);
+    const arr = Array.isArray(data.data) ? data.data : [];
+    const key = `${body.id || body.name}|${body.team}`;
+    const idx = arr.findIndex((r: any) => r.key === key);
+    const entry = { key, ...body };
+    if (idx >= 0) arr[idx] = entry;
+    else arr.push(entry);
+    await fs.writeFile(STORE, JSON.stringify({ data: arr }, null, 2), "utf-8");
+    return NextResponse.json({ status: "success", key });
+  } catch (e: any) {
+    return NextResponse.json({ status: "error", message: e.message });
   }
 }

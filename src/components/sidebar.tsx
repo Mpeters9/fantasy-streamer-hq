@@ -1,36 +1,21 @@
+// src/components/sidebar.tsx
+// (Kept lightweight for future reuse if you want a separate component)
 "use client";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-
-const links = [
-  { name: "🏠 Dashboard", href: "/dashboard/manual" },
-  { name: "📊 Manual Data", href: "/dashboard/manual-data" },
-  { name: "📈 Waivers", href: "/dashboard/waivers" },
-  { name: "⚙️ Weights", href: "/dashboard/weights" },
-];
 
 export default function Sidebar() {
-  const pathname = usePathname();
-
   return (
-    <aside className="bg-gray-900 text-gray-100 h-full w-56 p-4 space-y-3 border-r border-gray-800">
-      <h1 className="text-xl font-bold mb-4 text-blue-400 leading-tight">
-        Fantasy Streamer HQ
-      </h1>
-      <nav className="flex flex-col gap-2">
-        {links.map((link) => (
-          <Link
-            key={link.href}
-            href={link.href}
-            className={`block px-3 py-2 rounded-md transition ${
-              pathname === link.href
-                ? "bg-blue-700 text-white"
-                : "hover:bg-gray-800 text-gray-300"
-            }`}
-          >
-            {link.name}
-          </Link>
-        ))}
+    <aside className="w-60 shrink-0 bg-gray-900/70 border-r border-gray-800">
+      <div className="px-4 py-5 border-b border-gray-800">
+        <h1 className="text-xl font-bold">🏈 Streamer HQ</h1>
+        <p className="text-xs text-gray-400">Tuesday-proof waivers</p>
+      </div>
+      <nav className="p-3 space-y-1 text-sm">
+        <Link className="block px-3 py-2 rounded hover:bg-gray-800" href="/">🏠 Home</Link>
+        <Link className="block px-3 py-2 rounded hover:bg-gray-800" href="/dashboard/waivers">📊 Waivers</Link>
+        <Link className="block px-3 py-2 rounded hover:bg-gray-800" href="/dashboard/manual">🧠 Manual</Link>
+        <Link className="block px-3 py-2 rounded hover:bg-gray-800" href="/dashboard/manual-data">📝 Manual Data</Link>
+        <Link className="block px-3 py-2 rounded hover:bg-gray-800" href="/dashboard/weights">⚙️ Weights</Link>
       </nav>
     </aside>
   );
