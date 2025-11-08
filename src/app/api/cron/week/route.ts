@@ -1,24 +1,14 @@
-// src/app/api/cron/week/route.ts
 import { NextResponse } from "next/server";
 
-/**
- * Returns the "live" NFL week from ESPN.
- * Used as default when no override selected in the UI.
- */
-export async function GET() {
-  try {
-    const r = await fetch(
-      "https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?seasontype=2",
-      { cache: "no-store" }
-    );
-    const data = await r.json();
-    const week =
-      data?.events?.[0]?.week?.number ??
-      data?.week?.number ??
-      0;
+// Simple week resolver with manual override
+export async function GET(req: Request) {
+  const { searchParams } = new URL(req.url);
+  const wk = searchParams.get("week");
+  if (wk) return NextResponse.json({ week: Number(wk) });
 
-    return NextResponse.json({ status: "success", week: Number(week) });
-  } catch (e: any) {
-    return NextResponse.json({ status: "error", week: 0, message: e.message });
-  }
+  // Fallback: approximate NFL week by date (roughly Sep->Jan)
+  const now = new Date();
+  const start = new Date(now.getFullYear(), 8, 3); // early Sep
+  const diffW = Math.max(1, Math.min(18, Math.floor((now.getTime()-start.getTime())/(7*24*3600*1000))+1));
+  return NextResponse.json({ week: diffW });
 }

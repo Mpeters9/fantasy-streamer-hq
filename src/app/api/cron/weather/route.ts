@@ -1,14 +1,10 @@
 import { NextResponse } from "next/server";
+import { getWeatherForTeam } from "@/lib/weather";
 
-export async function GET() {
-  const weather = [
-    { matchup: "SEA @ GB", condition: "Rainy", temp: 51, wind: 10 },
-    { matchup: "CLE @ PIT", condition: "Cloudy", temp: 44, wind: 7 },
-    { matchup: "DEN @ LV", condition: "Clear", temp: 65, wind: 5 },
-  ];
-
-  return NextResponse.json({
-    status: "success",
-    weather,
-  });
+export async function GET(req: Request) {
+  const { searchParams } = new URL(req.url);
+  const team = (searchParams.get("team") || "").toUpperCase();
+  const kickoff = searchParams.get("kickoff") || new Date().toISOString();
+  const wx = await getWeatherForTeam(team, kickoff);
+  return NextResponse.json({ team, weather: wx });
 }

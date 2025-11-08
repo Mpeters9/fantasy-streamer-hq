@@ -2,12 +2,4 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Base light theme */
-html, body {
-  @apply bg-gray-50 text-gray-900 transition-colors duration-300;
-}
-
-/* Dark theme */
-.dark {
-  @apply bg-gray-950 text-gray-100;
-}
+html, body, #__next { height: 100%; }
