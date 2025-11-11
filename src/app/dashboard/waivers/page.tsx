@@ -1,86 +1,178 @@
+// src/app/dashboard/waivers/page.tsx
 "use client";
-import React, { useEffect, useMemo, useState } from "react";
-import type { Player } from "@/lib/types";
 
-type Row = {
-  id: string; name: string; team: string; position: string;
-  headshot?: string;
-  opponent?: string; spread?: number; implied?: number; weather?: string;
+import React, { useEffect, useState, useMemo } from "react";
+
+interface PlayerRow {
+  id: string;
+  name: string;
+  team: string;
+  pos: string;
+  opponent: string;
+  impliedTotal: number;
+  spread: number;
   streamerScore: number;
-};
+  metrics?: Record<string, number>;
+  week: number;
+}
 
 export default function WaiversPage() {
-  const [week, setWeek] = useState<number>(10);
-  const [rows, setRows] = useState<Row[]>([]);
-  const [pos, setPos] = useState("ALL");
-  const [status, setStatus] = useState("");
+  const [rows, setRows] = useState<PlayerRow[]>([]);
+  const [week, setWeek] = useState<number>(0);
+  const [status, setStatus] = useState("Loading…");
+  const [search, setSearch] = useState("");
+  const [sortBy, setSortBy] = useState<"streamerScore" | "impliedTotal" | "spread">("streamerScore");
 
-  const load = async (w?: number) => {
-    const wk = w ?? (await fetch("/api/cron/week").then(r=>r.json())).week;
-    setWeek(wk);
-    const data = await fetch(`/api/scoring?week=${wk}`).then(r=>r.json());
-    setRows(data.data || []);
-    setStatus(`✅ ${data.count} players`);
+  // ---- LOAD DATA ----
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const wkRes = await fetch("/api/cron/week");
+        const wkJson = await wkRes.json();
+        const wk = wkJson?.week ?? 11;
+        setWeek(wk);
+
+        const res = await fetch(`/api/scoring?week=${wk}`);
+        const json = await res.json();
+
+        if (!json?.data || !Array.isArray(json.data)) throw new Error("Invalid scoring data");
+
+        setRows(json.data);
+        setStatus(`✅ ${json.count} players loaded`);
+      } catch (err) {
+        console.error(err);
+        setStatus("❌ Failed to load waiver data");
+      }
+    };
+    load();
+  }, []);
+
+  // ---- SEARCH + SORT ----
+  const filtered = useMemo(() => {
+    const q = search.toLowerCase();
+    let data = rows;
+    if (q) {
+      data = data.filter(
+        (r) =>
+          r.name?.toLowerCase().includes(q) ||
+          r.team?.toLowerCase().includes(q) ||
+          r.pos?.toLowerCase().includes(q)
+      );
+    }
+    return [...data].sort((a, b) => b[sortBy] - a[sortBy]);
+  }, [rows, search, sortBy]);
+
+  // ---- UTILITIES ----
+  const scoreColor = (score: number) => {
+    if (score >= 90) return "text-emerald-400";
+    if (score >= 75) return "text-green-400";
+    if (score >= 60) return "text-yellow-400";
+    if (score >= 45) return "text-orange-400";
+    return "text-red-400";
   };
 
-  useEffect(()=>{ load().catch(console.error); }, []);
+  const spreadColor = (spread: number) => (spread < 0 ? "text-emerald-400" : "text-red-400");
 
-  const filtered = useMemo(()=>{
-    const list = rows.slice().sort((a,b)=>b.streamerScore - a.streamerScore);
-    if (pos === "ALL") return list;
-    return list.filter(r => r.position === pos);
-  }, [rows, pos]);
+  const weatherBadge = (metrics?: Record<string, number>) => {
+    const w = metrics?.weather ?? 0;
+    if (w <= -5) return <span className="bg-red-600/20 text-red-300 px-2 py-1 rounded text-xs">🌧️ Poor</span>;
+    if (w >= 3) return <span className="bg-emerald-600/20 text-emerald-300 px-2 py-1 rounded text-xs">☀️ Clear</span>;
+    return <span className="bg-slate-700/40 text-slate-300 px-2 py-1 rounded text-xs">🌤️ Neutral</span>;
+  };
 
   return (
-    <div className="space-y-4">
-      <header className="flex items-end gap-3">
+    <div className="min-h-screen bg-slate-950 text-slate-100 p-6 space-y-6">
+      <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold">🚨 Waivers</h1>
-          <p className="text-gray-400">Week {week} {status && "• " + status}</p>
+          <h1 className="text-2xl font-bold">🚨 Waiver Board</h1>
+          <p className="text-slate-400 text-sm">
+            Week {week} • {status}
+          </p>
         </div>
-        <select value={pos} onChange={(e)=>setPos(e.target.value)} className="ml-auto bg-gray-900 border border-gray-700 rounded px-3 py-2">
-          <option>ALL</option><option>QB</option><option>RB</option><option>WR</option><option>TE</option>
-        </select>
-        <button onClick={()=>load(week)} className="px-3 py-2 bg-blue-600 hover:bg-blue-700 rounded">🔁 Refresh</button>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as any)}
+            className="bg-slate-900 border border-slate-700 rounded px-3 py-2 text-sm"
+          >
+            <option value="streamerScore">Sort: Streamer Score</option>
+            <option value="impliedTotal">Sort: Implied Total</option>
+            <option value="spread">Sort: Spread</option>
+          </select>
+          <input
+            type="text"
+            placeholder="Search players..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="bg-slate-900 border border-slate-700 rounded px-3 py-2 text-sm text-white placeholder-slate-500"
+          />
+        </div>
       </header>
 
-      <div className="overflow-x-auto rounded border border-gray-800">
-        <table className="w-full text-sm">
-          <thead className="bg-gray-900">
+      <section className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-md">
+        <table className="min-w-full text-sm">
+          <thead className="bg-slate-800 text-slate-300 uppercase text-xs">
             <tr>
-              <th className="text-left p-2">Player</th>
-              <th className="text-left p-2">Opp</th>
-              <th className="text-right p-2">Spread</th>
-              <th className="text-right p-2">Implied</th>
-              <th className="text-left p-2">Weather</th>
-              <th className="text-right p-2">Score</th>
+              <th className="px-3 py-2 text-left">Player</th>
+              <th className="px-3 py-2 text-left">Team</th>
+              <th className="px-3 py-2 text-left">Pos</th>
+              <th className="px-3 py-2 text-left">Opponent</th>
+              <th className="px-3 py-2 text-right">Streamer Score</th>
+              <th className="px-3 py-2 text-right">Implied Total</th>
+              <th className="px-3 py-2 text-right">Spread</th>
+              <th className="px-3 py-2 text-center">Weather</th>
             </tr>
           </thead>
           <tbody>
-            {filtered.map(r => (
-              <tr key={r.id} className="border-t border-gray-800 hover:bg-gray-900/50">
-                <td className="p-2">
-                  <div className="flex items-center gap-2">
-                    <img src={r.headshot || "https://a.espncdn.com/i/headshots/nophoto.png"} className="w-8 h-8 rounded-full border border-gray-800" onError={(e)=>((e.target as HTMLImageElement).src="https://a.espncdn.com/i/headshots/nophoto.png")} />
-                    <div>
-                      <div className="font-medium">{r.name}</div>
-                      <div className="text-xs text-gray-400">{r.team} · {r.position}</div>
-                    </div>
-                  </div>
+            {filtered.length === 0 ? (
+              <tr>
+                <td colSpan={8} className="text-center text-slate-400 py-6">
+                  No players found.
                 </td>
-                <td className="p-2">{r.opponent}</td>
-                <td className="p-2 text-right">{r.spread ?? "—"}</td>
-                <td className="p-2 text-right">{r.implied ?? "—"}</td>
-                <td className="p-2">{r.weather ?? "—"}</td>
-                <td className="p-2 text-right font-semibold">{r.streamerScore}</td>
               </tr>
-            ))}
-            {filtered.length === 0 && (
-              <tr><td colSpan={6} className="p-4 text-center text-gray-400">No rows</td></tr>
+            ) : (
+              filtered.map((p) => (
+                <tr
+                  key={p.id}
+                  className="border-b border-slate-800 hover:bg-slate-800/50 transition"
+                >
+                  <td className="px-3 py-2 font-medium">{p.name}</td>
+                  <td className="px-3 py-2">{p.team}</td>
+                  <td
+                    className={`px-3 py-2 font-semibold ${
+                      p.pos === "QB"
+                        ? "text-sky-400"
+                        : p.pos === "RB"
+                        ? "text-green-400"
+                        : p.pos === "WR"
+                        ? "text-yellow-400"
+                        : p.pos === "TE"
+                        ? "text-purple-400"
+                        : p.pos === "K"
+                        ? "text-pink-400"
+                        : "text-slate-400"
+                    }`}
+                  >
+                    {p.pos}
+                  </td>
+                  <td className="px-3 py-2">{p.opponent}</td>
+                  <td className={`px-3 py-2 text-right font-semibold ${scoreColor(p.streamerScore)}`}>
+                    {p.streamerScore.toFixed(1)}
+                  </td>
+                  <td className="px-3 py-2 text-right text-slate-300">
+                    {p.impliedTotal?.toFixed(1)}
+                  </td>
+                  <td className={`px-3 py-2 text-right ${spreadColor(p.spread)}`}>
+                    {p.spread > 0 ? `+${p.spread}` : p.spread}
+                  </td>
+                  <td className="px-3 py-2 text-center">{weatherBadge(p.metrics)}</td>
+                </tr>
+              ))
             )}
           </tbody>
         </table>
-      </div>
+      </section>
     </div>
   );
 }
